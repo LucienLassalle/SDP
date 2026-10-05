@@ -34,3 +34,4 @@ MemoryDenyWriteExecute=yes
 RestrictRealtime=yes
 RestrictNamespaces=yes
 RemoveIPC=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6

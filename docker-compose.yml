@@ -5,6 +5,10 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     environment:
       - DB_HOST=db
       - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
@@ -19,6 +23,10 @@ services:
     build: ./db
     image: ghcr.io/lucienlassalle/sdp-db:${IMAGE_TAG:-dev}
     restart: unless-stopped
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     environment:
       MYSQL_ROOT_PASSWORD: root_password_123
       MYSQL_DATABASE: forum

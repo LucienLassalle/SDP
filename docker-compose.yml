@@ -9,7 +9,8 @@ services:
       - DB_HOST=db
       - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - frontend
       - backend

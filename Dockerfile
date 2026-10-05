@@ -21,4 +21,7 @@ ENV NODE_ENV=production
 
 EXPOSE 3000
 USER node
+# La page d'accueil interroge la base : l'application n'est saine que si MySQL répond aussi
+HEALTHCHECK --interval=10s --timeout=3s --start-period=20s --retries=3 \
+  CMD wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1
 CMD ["node", "app.js"]

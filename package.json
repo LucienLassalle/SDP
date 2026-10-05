@@ -1,7 +1,7 @@
 {
-  "name": "sdp-forum-vulnerable",
+  "name": "SDP",
   "version": "1.0.0",
-  "description": "TP sécurité - messagerie/forum volontairement vulnérable (SQLi, credentials en clair, image obsolète)",
+  "description": "Little forum for SDP",
   "main": "app.js",
   "scripts": {
     "start": "node app.js"

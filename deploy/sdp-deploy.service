@@ -39,4 +39,7 @@ MemoryDenyWriteExecute=yes
 RestrictRealtime=yes
 RestrictNamespaces=yes
 RemoveIPC=yes
-RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+# Aucun réseau : le service ne parle qu'au socket Docker (pull et healthchecks passent par dockerd)
+PrivateNetwork=yes
+IPAddressDeny=any
+RestrictAddressFamilies=AF_UNIX

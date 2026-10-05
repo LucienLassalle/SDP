@@ -12,7 +12,7 @@ ExecStart=/bin/bash /opt/sdp/deploy/check.sh
 # /var/lib/sdp-check/latest-tag est lu par sdp-deploy (le tag est public)
 StateDirectory=sdp-check
 StateDirectoryMode=0755
-UMask=0022
+UMask=0077
 ProtectSystem=strict
 ProtectHome=yes
 # Espace utilisateurs isolé : seuls le service et son groupe sont visibles

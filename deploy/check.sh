@@ -20,4 +20,6 @@ if ! [[ "$latest" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$ 
 fi
 
 echo "$latest" > "$state/latest-tag.new"
+# Seul fichier lisible par les autres utilisateurs (sdp-deploy)
+chmod 0644 "$state/latest-tag.new"
 mv "$state/latest-tag.new" "$state/latest-tag"

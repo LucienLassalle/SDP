@@ -16,6 +16,7 @@ updates:
     directories:
       - /
       - /db
+      - /tls
     schedule:
       interval: weekly
     cooldown:

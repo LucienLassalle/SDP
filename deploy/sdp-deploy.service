@@ -17,6 +17,8 @@ Environment=DOCKER_CONFIG=%S/sdp-deploy/docker
 UMask=0077
 ProtectSystem=strict
 ProtectHome=yes
+# Espace utilisateurs isolé : seuls le service et son groupe sont visibles
+PrivateUsers=yes
 PrivateTmp=yes
 NoNewPrivileges=yes
 CapabilityBoundingSet=

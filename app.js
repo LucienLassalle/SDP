@@ -1,3 +1,5 @@
+const fs = require('fs');
+const https = require('https');
 const express = require('express');
 const session = require('express-session');
 const bodyParser = require('body-parser');
@@ -159,5 +161,12 @@ app.get('/search', (req, res) => {
     req.session.user));
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log('Forum (vulnérable) démarré sur le port ' + PORT));
+// HTTPS obligatoire : le cookie de session est secure, il n'est jamais envoyé en HTTP
+const TLS_DIR = process.env.TLS_DIR || '/run/tls';
+const tls = {
+  key: fs.readFileSync(TLS_DIR + '/key.pem'),
+  cert: fs.readFileSync(TLS_DIR + '/cert.pem')
+};
+
+const PORT = process.env.PORT || 3443;
+https.createServer(tls, app).listen(PORT, () => console.log('Forum (vulnérable) démarré en HTTPS sur le port ' + PORT));

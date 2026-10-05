@@ -19,9 +19,10 @@ COPY package.json app.js ./
 
 ENV NODE_ENV=production
 
-EXPOSE 3000
+EXPOSE 3443
 USER node
 # La page d'accueil interroge la base : l'application n'est saine que si MySQL répond aussi
+# (certificat autosigné : pas de vérification pour cet appel local)
 HEALTHCHECK --interval=10s --timeout=3s --start-period=20s --retries=3 \
-  CMD wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1
+  CMD ["node", "-e", "require('https').get({host: '127.0.0.1', port: 3443, path: '/', rejectUnauthorized: false}, r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
 CMD ["node", "app.js"]

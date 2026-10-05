@@ -4,7 +4,7 @@ services:
     image: ghcr.io/lucienlassalle/sdp:${IMAGE_TAG:-dev}
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${HTTPS_PORT:-443}:3443"
     mem_limit: 256m
     pids_limit: 200
     read_only: true
@@ -15,12 +15,35 @@ services:
     environment:
       - DB_HOST=db
       - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
+    volumes:
+      # Certificat créé par le service tls, hors de l'image
+      - tls:/run/tls:ro
     depends_on:
+      tls:
+        condition: service_completed_successfully
       db:
         condition: service_healthy
     networks:
       - frontend
       - backend
+
+  # Génère le certificat autosigné (s'il manque ou expire bientôt) puis s'arrête
+  tls:
+    build: ./tls
+    image: ghcr.io/lucienlassalle/sdp-tls:${IMAGE_TAG:-dev}
+    restart: "no"
+    network_mode: none
+    mem_limit: 64m
+    pids_limit: 20
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      - TLS_SAN=${TLS_SAN:-DNS:localhost,IP:127.0.0.1}
+    volumes:
+      - tls:/tls
 
   db:
     build: ./db
@@ -53,3 +76,4 @@ networks:
 
 volumes:
   db-data:
+  tls:

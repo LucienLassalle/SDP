@@ -11,18 +11,20 @@ docker compose up --build
 Le workflow GitHub Actions `Semgrep` analyse le code à chaque push et pull request,
 et peut également être lancé manuellement depuis l'onglet Actions. Il utilise les
 règles détectées automatiquement par Semgrep (`--config auto`) et publie le rapport
-SARIF comme artefact de l'exécution.
+SARIF comme artefact de l'exécution. Les alertes sont aussi affichées dans les logs
+avec la règle, la sévérité, le fichier, la ligne et le détail du problème.
 
-Les résultats ne font pas échouer le workflow : ce projet contient volontairement
-des vulnérabilités à des fins pédagogiques. Les erreurs d'installation ou d'exécution
-de Semgrep, en revanche, font échouer l'étape d'analyse.
+L'option `--error` fait échouer l'étape et bloque la validation de la PR dès qu'une
+alerte est détectée. Les erreurs d'installation ou d'exécution de Semgrep font
+également échouer l'analyse.
 
 ## Release
 
 À chaque release publiée (tag `vX.Y.Z`), le workflow `Release` (`.github/workflows/release.yml`) :
 
 1. vérifie que le tag respecte le format `vX.Y.Z` et que son commit est bien sur `main` ;
-2. construit l'image Docker et la publie sur GHCR (`ghcr.io/<owner>/<repo>:<version>`).
+2. construit l'image Docker et la publie sur GHCR (`ghcr.io/<owner>/<repo>:<version>`) ;
+3. génère les SBOM SPDX du code et de l'image pour cette version.
 
 Les pré-releases ne sont pas publiées.
 

@@ -29,7 +29,7 @@ if [ "$latest" = "$current" ] || [ "$latest" = "$failed" ]; then
 fi
 
 echo "Mise à jour : ${current:-aucune} -> $latest"
-IMAGE_TAG="$latest" "${compose[@]}" pull web
+IMAGE_TAG="$latest" "${compose[@]}" pull web db
 IMAGE_TAG="$latest" "${compose[@]}" up -d --no-build
 
 for _ in $(seq 1 30); do

@@ -43,12 +43,17 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.event.release.tag_name }}
         run: |
-          image="ghcr.io/${GITHUB_REPOSITORY,,}:${TAG}"
-          docker build -t "$image" .
           echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-          docker push "$image"
-          digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$image")
-          echo "Image publiée : \`$digest\`" >> "$GITHUB_STEP_SUMMARY"
+          # $1 = suffixe du nom de l'image, $2 = dossier du Dockerfile
+          publish() {
+            image="ghcr.io/${GITHUB_REPOSITORY,,}$1:${TAG}"
+            docker build -t "$image" "$2"
+            docker push "$image"
+            digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$image")
+            echo "Image publiée : \`$digest\`" >> "$GITHUB_STEP_SUMMARY"
+          }
+          publish "" .
+          publish -db db
 
   sbom:
     name: SBOM

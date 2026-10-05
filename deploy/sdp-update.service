@@ -13,3 +13,6 @@ ProtectSystem=strict
 ReadWritePaths=/opt/sdp/deploy
 ProtectHome=read-only
 PrivateTmp=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+RestrictSUIDSGID=yes

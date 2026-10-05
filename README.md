@@ -27,6 +27,22 @@ SDP-Tests est pour l'instant pris sur sa branche `main` (`SDP_TESTS_REF` dans le
 un avertissement le rappelle à chaque exécution). À terme, la CI utilisera une release fixe
 de SDP-Tests.
 
+### Empêcher de contourner la CI
+
+Sur une pull request, GitHub exécute les workflows **de la branche de la PR** : un contributeur
+peut donc modifier `ci.yml` pour sauter Semgrep. Ce sont les règles de la branche `main`
+(Settings → Rules) qui l'en empêchent :
+
+- **Require status checks to pass** : `Semgrep scan` et `Tests`. Un job supprimé ne rend
+  jamais son statut, la PR reste bloquée ;
+- **Require review from Code Owners**, avec **Dismiss stale approvals** et
+  **Require approval of the most recent reviewable push** : toute modification de
+  `.github/` doit être validée par un autre code owner ;
+- **Aucun contournement** (liste de bypass vide), y compris pour les admins ;
+- Settings → Actions : **Require approval for first-time contributors** pour les PR venant de forks.
+
+Ne jamais utiliser `pull_request_target` pour exécuter le code d'une PR : il donne accès aux secrets.
+
 ## Release
 
 À chaque release publiée (tag `vX.Y.Z` ou `vX.Y.Z-suffixe`, ex. `v0.0.2-beta`), le workflow `Release` (`.github/workflows/release.yml`) :

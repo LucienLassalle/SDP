@@ -3,7 +3,6 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 REPO="${REPO:-LucienLassalle/SDP}"
-HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:3000/}"
 compose=(docker compose)
 state="${STATE_DIRECTORY:-deploy}"
 
@@ -32,17 +31,13 @@ fi
 
 echo "Mise à jour : ${current:-aucune} -> $latest"
 IMAGE_TAG="$latest" "${compose[@]}" pull web db
-IMAGE_TAG="$latest" "${compose[@]}" up -d --no-build
-
-for _ in $(seq 1 30); do
-  if curl -fs -o /dev/null "$HEALTH_URL"; then
-    echo "$latest" > "$state/.current-tag"
-    rm -f "$state/.failed-tag"
-    echo "Version $latest en ligne"
-    exit 0
-  fi
-  sleep 2
-done
+# --wait attend que les healthchecks des conteneurs soient au vert
+if IMAGE_TAG="$latest" "${compose[@]}" up -d --no-build --wait --wait-timeout 120; then
+  echo "$latest" > "$state/.current-tag"
+  rm -f "$state/.failed-tag"
+  echo "Version $latest en ligne"
+  exit 0
+fi
 
 echo "La version $latest ne répond pas"
 echo "$latest" > "$state/.failed-tag"

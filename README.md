@@ -6,27 +6,52 @@
 docker compose up --build
 ```
 
-## Analyse Semgrep
+## CI
 
-Le workflow GitHub Actions `Semgrep` analyse le code à chaque push et pull request,
-et peut également être lancé manuellement depuis l'onglet Actions. Il utilise les
-règles détectées automatiquement par Semgrep (`--config auto`) et publie le rapport
-SARIF comme artefact de l'exécution. Les alertes sont aussi affichées dans les logs
-avec la règle, la sévérité, le fichier, la ligne et le détail du problème.
+Le workflow `CI` (`.github/workflows/ci.yml`) tourne sur chaque pull request, sur `main`
+et à la demande. Chaque étape ne démarre que si la précédente a réussi :
 
-L'option `--error` fait échouer l'étape et bloque la validation de la PR dès qu'une
-alerte est détectée. Les erreurs d'installation ou d'exécution de Semgrep font
-également échouer l'analyse.
+1. **Semgrep scan** : analyse du code avec les règles automatiques de Semgrep
+   (`--config auto --error`), rapport SARIF publié comme artefact. La moindre alerte bloque la PR.
+2. **Tests**, sur la VM jetable fournie par GitHub, avec les tests de
+   [SDP-Tests](https://github.com/LucienLassalle/SDP-Tests) :
+   1. construction de l'image Docker ;
+   2. analyses statiques (`pytest -m static`) : Trivy sur le code et l'image
+      (vulnérabilités, secrets, mauvaises configurations) et `systemd-analyze security`
+      sur `deploy/*.service`. Si elles échouent, l'application n'est pas déployée ;
+   3. démarrage de l'application avec `docker compose` ;
+   4. tests fonctionnels (`pytest -m functional`) ;
+   5. arrêt de l'application (la VM est de toute façon détruite).
+
+SDP-Tests est pour l'instant pris sur sa branche `main` (`SDP_TESTS_REF` dans le workflow,
+un avertissement le rappelle à chaque exécution). À terme, la CI utilisera une release fixe
+de SDP-Tests.
+
+### Empêcher de contourner la CI
+
+Sur une pull request, GitHub exécute les workflows **de la branche de la PR** : un contributeur
+peut donc modifier `ci.yml` pour sauter Semgrep. Ce sont les règles de la branche `main`
+(Settings → Rules) qui l'en empêchent :
+
+- **Require status checks to pass** : `Semgrep scan` et `Tests`. Un job supprimé ne rend
+  jamais son statut, la PR reste bloquée ;
+- **Require review from Code Owners**, avec **Dismiss stale approvals** et
+  **Require approval of the most recent reviewable push** : toute modification de
+  `.github/` doit être validée par un autre code owner ;
+- **Aucun contournement** (liste de bypass vide), y compris pour les admins ;
+- Settings → Actions : **Require approval for first-time contributors** pour les PR venant de forks.
+
+Ne jamais utiliser `pull_request_target` pour exécuter le code d'une PR : il donne accès aux secrets.
 
 ## Release
 
-À chaque release publiée (tag `vX.Y.Z`), le workflow `Release` (`.github/workflows/release.yml`) :
+À chaque release publiée (tag `vX.Y.Z` ou `vX.Y.Z-suffixe`, ex. `v0.0.2-beta`), le workflow `Release` (`.github/workflows/release.yml`) :
 
-1. vérifie que le tag respecte le format `vX.Y.Z` et que son commit est bien sur `main` ;
+1. vérifie le format du tag et que son commit est bien sur `main` ;
 2. construit l'image Docker et la publie sur GHCR (`ghcr.io/<owner>/<repo>:<version>`) ;
 3. génère les SBOM SPDX du code et de l'image pour cette version.
 
-Les pré-releases ne sont pas publiées.
+Les releases cochées « pre-release » sur GitHub ne sont pas publiées, quel que soit leur tag.
 
 ## Déploiement sur le serveur
 

@@ -63,11 +63,18 @@ systemctl daemon-reload
 systemctl enable --now sdp-update.timer
 ```
 
-Si le dépôt ou l'image sont privés, créer un token GitHub en lecture (`read:packages`, et `contents:read` si le dépôt est privé) puis :
+Le service ne tourne pas en root : systemd crée à chaque lancement un utilisateur éphémère, seulement
+membre du groupe `docker` (qui doit exister). Ses fichiers (versions déployées, identifiants GHCR) sont
+dans `/var/lib/sdp`, et `/opt/sdp` lui est en lecture seule. Le groupe `docker` donne un accès équivalent
+à root via Docker : c'est le seul privilège du service.
+
+Si le dépôt ou les images sont privés, créer un token GitHub en lecture (`read:packages`, et `contents:read`
+si le dépôt est privé). Le service se connecte lui-même à GHCR avec :
 
 ```bash
-echo "GH_TOKEN=<token>" > /opt/sdp/deploy/.env
-echo "<token>" | docker login ghcr.io -u <utilisateur> --password-stdin
+install -m 600 /dev/null /opt/sdp/deploy/.env
+echo "GH_TOKEN=<token>" >> /opt/sdp/deploy/.env
+echo "GH_USER=<utilisateur du token>" >> /opt/sdp/deploy/.env
 ```
 
-Suivi : `journalctl -u sdp-update -f` · version en ligne : `cat /opt/sdp/deploy/.current-tag`
+Suivi : `journalctl -u sdp-update -f` · version en ligne : `cat /var/lib/sdp/.current-tag`

@@ -5,6 +5,7 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    read_only: true
     cap_drop:
       - ALL
     security_opt:
@@ -23,6 +24,11 @@ services:
     build: ./db
     image: ghcr.io/lucienlassalle/sdp-db:${IMAGE_TAG:-dev}
     restart: unless-stopped
+    read_only: true
+    # Seuls les fichiers temporaires et le socket MySQL sont inscriptibles (+ le volume de données)
+    tmpfs:
+      - /tmp
+      - /var/run/mysqld
     cap_drop:
       - ALL
     security_opt:

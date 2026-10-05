@@ -59,6 +59,7 @@ jobs:
     name: SBOM
     if: ${{ !github.event.release.prerelease }}
     runs-on: ubuntu-latest
+    environment: production
     permissions:
       contents: write
     steps:

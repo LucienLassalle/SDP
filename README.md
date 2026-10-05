@@ -20,13 +20,13 @@ alerte est détectée. Les erreurs d'installation ou d'exécution de Semgrep fon
 
 ## Release
 
-À chaque release publiée (tag `vX.Y.Z`), le workflow `Release` (`.github/workflows/release.yml`) :
+À chaque release publiée (tag `vX.Y.Z` ou `vX.Y.Z-suffixe`, ex. `v0.0.2-beta`), le workflow `Release` (`.github/workflows/release.yml`) :
 
-1. vérifie que le tag respecte le format `vX.Y.Z` et que son commit est bien sur `main` ;
+1. vérifie le format du tag et que son commit est bien sur `main` ;
 2. construit l'image Docker et la publie sur GHCR (`ghcr.io/<owner>/<repo>:<version>`) ;
 3. génère les SBOM SPDX du code et de l'image pour cette version.
 
-Les pré-releases ne sont pas publiées.
+Les releases cochées « pre-release » sur GitHub ne sont pas publiées, quel que soit leur tag.
 
 ## Déploiement sur le serveur
 

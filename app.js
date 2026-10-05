@@ -2,6 +2,14 @@ const express = require('express');
 const session = require('express-session');
 const bodyParser = require('body-parser');
 const mysql = require('mysql');
+const csrf = require('csurf');
+const createDOMPurify = require('dompurify');
+const { JSDOM } = require('jsdom');
+
+const DOMPurify = createDOMPurify(new JSDOM('').window);
+
+// Every tag stripped, text kept with &, < and > escaped
+DOMPurify.setConfig({ ALLOWED_TAGS: [], KEEP_CONTENT: true });
 
 const app = express();
 
@@ -18,12 +26,29 @@ const db = mysql.createPool(DB_CONFIG);
 
 app.use(bodyParser.urlencoded({ extended: false }));
 
+const SESSION_SECRET = process.env.SESSION_SECRET;
+if (!SESSION_SECRET) throw new Error('SESSION_SECRET must be set');
+
+const SESSION_MAX_AGE = 60 * 60 * 1000;
+
 app.use(session({
-  secret: 'super-secret-cle-en-dur',
+  name: 'forum.sid',
+  secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: true,
-  cookie: { httpOnly: false, secure: false }
+  cookie: {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'strict',
+    domain: process.env.COOKIE_DOMAIN,
+    path: '/',
+    // maxAge is applied after expires and recomputes it per session
+    expires: new Date(Date.now() + SESSION_MAX_AGE),
+    maxAge: SESSION_MAX_AGE
+  }
 }));
+
+app.use(csrf());
 
 function layout(title, body, user) {
   return `<!doctype html>
@@ -56,6 +81,7 @@ app.get('/', (req, res) => {
          <small>${r.created_at}</small><p>${r.content}</p></div>`).join('');
       const form = req.session.user
         ? `<form method="POST" action="/post">
+             <input type="hidden" name="_csrf" value="${req.csrfToken()}">
              <textarea name="content" rows="3" placeholder="Votre message..."></textarea>
              <button type="submit">Publier</button>
            </form>`
@@ -68,8 +94,8 @@ app.post('/post', (req, res) => {
   if (!req.session.user) return res.redirect('/login');
   const author = req.session.user.username;
   const content = req.body.content || '';
-  const sql = `INSERT INTO messages (author, content) VALUES ('${author}', '${content}')`;
-  db.query(sql, (err) => {
+  const sql = 'INSERT INTO messages (author, content) VALUES (?, ?)';
+  db.query(sql, [author, content], (err) => {
     if (err) return res.status(500).send('Erreur BDD : ' + err.message);
     res.redirect('/');
   });
@@ -79,6 +105,7 @@ app.get('/login', (req, res) => {
   res.send(layout('Connexion', `
     <h1>Connexion</h1>
     <form method="POST" action="/login">
+      <input type="hidden" name="_csrf" value="${req.csrfToken()}">
       <input name="username" placeholder="Identifiant" autocomplete="off">
       <input name="password" type="password" placeholder="Mot de passe">
       <button type="submit">Se connecter</button>
@@ -116,11 +143,13 @@ app.get('/search', (req, res) => {
     return db.query(sql, (err, rows) => {
       if (err) return res.status(500).send('Erreur BDD : ' + err.message);
       results = rows.map(r =>
-        `<div class="msg"><span class="author">${r.author}</span><p>${r.content}</p></div>`).join('')
+        `<div class="msg"><span class="author">${DOMPurify.sanitize(r.author)}</span><p>${DOMPurify.sanitize(r.content)}</p></div>`).join('')
         || '<p>Aucun résultat.</p>';
+      // DOMPurify does not escape quotes in text, required inside value="..."
+      const qAttr = DOMPurify.sanitize(q).replace(/"/g, '&quot;');
       res.send(layout('Recherche', `
         <h1>Recherche</h1>
-        <form method="GET"><input name="q" value="${q}" placeholder="Rechercher..."><button>OK</button></form>
+        <form method="GET"><input name="q" value="${qAttr}" placeholder="Rechercher..."><button>OK</button></form>
         <hr>${results}`, req.session.user));
     });
   }

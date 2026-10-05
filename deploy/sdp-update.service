@@ -1,0 +1,10 @@
+[Unit]
+Description=SDP - déploiement de la dernière release
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/sdp
+EnvironmentFile=-/opt/sdp/deploy/.env
+ExecStart=/bin/bash /opt/sdp/deploy/update.sh

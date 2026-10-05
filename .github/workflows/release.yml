@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Build & push (GHCR)
+    if: ${{ !github.event.release.prerelease }}
+    runs-on: ubuntu-24.04
+    environment: production
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Vérification de la release
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag $TAG invalide, format attendu : vX.Y.Z"
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::Le commit de la release $TAG n'est pas sur main"
+            exit 1
+          fi
+
+      - name: Build et push (tag = version de la release)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}:${TAG}"
+          docker build -t "$image" .
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker push "$image"
+          digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$image")
+          echo "Image publiée : \`$digest\`" >> "$GITHUB_STEP_SUMMARY"

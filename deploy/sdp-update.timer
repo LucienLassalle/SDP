@@ -1,0 +1,10 @@
+[Unit]
+Description=SDP - vérification des releases chaque heure
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=1h
+Unit=sdp-update.service
+
+[Install]
+WantedBy=timers.target

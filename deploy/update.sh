@@ -5,11 +5,13 @@ cd "$(dirname "$0")/.."
 REPO="${REPO:-LucienLassalle/SDP}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:3000/}"
 compose=(docker compose)
-state=deploy
+state="${STATE_DIRECTORY:-deploy}"
 
 auth=()
 if [ -n "${GH_TOKEN:-}" ]; then
   auth=(-H "Authorization: Bearer $GH_TOKEN")
+  # Identifiants enregistrés dans DOCKER_CONFIG (StateDirectory du service)
+  echo "$GH_TOKEN" | docker login ghcr.io -u "${GH_USER:-${REPO%%/*}}" --password-stdin >/dev/null
 fi
 
 latest=$(curl -fsS "${auth[@]}" -H "Accept: application/vnd.github+json" \

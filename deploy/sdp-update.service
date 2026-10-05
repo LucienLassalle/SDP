@@ -8,10 +8,15 @@ Type=oneshot
 WorkingDirectory=/opt/sdp
 EnvironmentFile=-/opt/sdp/deploy/.env
 ExecStart=/bin/bash /opt/sdp/deploy/update.sh
+# Utilisateur éphémère, seulement membre du groupe docker
+DynamicUser=yes
+SupplementaryGroups=docker
+# /var/lib/sdp : versions déployées et identifiants GHCR
+StateDirectory=sdp
+Environment=DOCKER_CONFIG=%S/sdp/docker
 UMask=0077
 ProtectSystem=strict
-ReadWritePaths=/opt/sdp/deploy
-ProtectHome=read-only
+ProtectHome=yes
 PrivateTmp=yes
 NoNewPrivileges=yes
 CapabilityBoundingSet=

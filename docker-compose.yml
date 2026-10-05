@@ -10,6 +10,9 @@ services:
       - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
     depends_on:
       - db
+    networks:
+      - frontend
+      - backend
 
   db:
     build: ./db
@@ -18,10 +21,16 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: root_password_123
       MYSQL_DATABASE: forum
-    ports:
-      - "3306:3306"
     volumes:
       - db-data:/var/lib/mysql
+    networks:
+      - backend
+
+networks:
+  frontend:
+  # Réseau sans accès extérieur : seule l'application parle à la base
+  backend:
+    internal: true
 
 volumes:
   db-data:

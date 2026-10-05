@@ -12,7 +12,8 @@ services:
       - db
 
   db:
-    image: mysql:9.7.2@sha256:e2bde46db6563855d7177adb5f0b57b9dc663f5a20927a90f4259d3312068497
+    build: ./db
+    image: ghcr.io/lucienlassalle/sdp-db:${IMAGE_TAG:-dev}
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: root_password_123
@@ -20,7 +21,6 @@ services:
     ports:
       - "3306:3306"
     volumes:
-      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
       - db-data:/var/lib/mysql
 
 volumes:

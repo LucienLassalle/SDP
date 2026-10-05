@@ -82,8 +82,9 @@ jobs:
       - name: Install test dependencies
         run: python -m pip install -r sdp-tests/requirements.txt
 
-      - name: Build Docker image
-        run: docker build -t "$SDP_IMAGE" sdp
+      - name: Build Docker images
+        working-directory: sdp
+        run: SESSION_SECRET=unused docker compose build
 
       - name: Analyses statiques (Trivy, systemd)
         working-directory: sdp-tests

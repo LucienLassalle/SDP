@@ -97,13 +97,15 @@ jobs:
         run: |
           SESSION_SECRET=$(openssl rand -hex 32)
           export SESSION_SECRET
-          docker compose up -d --no-build
+          docker compose up -d --no-build --wait --wait-timeout 120
+          # Certificat autosigné généré par le service tls, pour que les tests le vérifient
+          docker compose run --rm --no-deps --entrypoint cat tls /tls/cert.pem > "$RUNNER_TEMP/sdp-ca.pem"
 
       - name: Tests fonctionnels
         working-directory: sdp-tests
         env:
-          SDP_URL: http://localhost:3000
-        run: pytest -m functional
+          SDP_URL: https://localhost
+        run: REQUESTS_CA_BUNDLE="$RUNNER_TEMP/sdp-ca.pem" pytest -m functional
 
       - name: Logs de l'application
         if: failure()

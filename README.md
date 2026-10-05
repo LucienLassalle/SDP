@@ -15,10 +15,11 @@ et à la demande. Chaque étape ne démarre que si la précédente a réussi :
    (`--config auto --error`), rapport SARIF publié comme artefact. La moindre alerte bloque la PR.
 2. **Tests**, sur la VM jetable fournie par GitHub, avec les tests de
    [SDP-Tests](https://github.com/LucienLassalle/SDP-Tests) :
-   1. construction de l'image Docker ;
-   2. analyses statiques (`pytest -m static`) : Trivy sur le code et l'image
-      (vulnérabilités, secrets, mauvaises configurations) et `systemd-analyze security`
-      sur `deploy/*.service`. Si elles échouent, l'application n'est pas déployée ;
+   1. construction des images Docker du compose (application et base de données) ;
+   2. analyses statiques (`pytest -m static`) : Trivy sur le code et sur chaque image
+      (vulnérabilités, secrets, mauvaises configurations), KICS sur `docker-compose.yml`
+      et `systemd-analyze security` sur `deploy/*.service`. Si elles échouent,
+      l'application n'est pas déployée ;
    3. démarrage de l'application avec `docker compose` ;
    4. tests fonctionnels (`pytest -m functional`) ;
    5. arrêt de l'application (la VM est de toute façon détruite).
@@ -27,35 +28,29 @@ SDP-Tests est pour l'instant pris sur sa branche `main` (`SDP_TESTS_REF` dans le
 un avertissement le rappelle à chaque exécution). À terme, la CI utilisera une release fixe
 de SDP-Tests.
 
-### Empêcher de contourner la CI
+## Base de données
 
-Sur une pull request, GitHub exécute les workflows **de la branche de la PR** : un contributeur
-peut donc modifier `ci.yml` pour sauter Semgrep. Ce sont les règles de la branche `main`
-(Settings → Rules) qui l'en empêchent :
+`db/Dockerfile` construit l'image MySQL à partir de l'image officielle `mysql` (LTS, épinglée par digest) :
+MySQL Shell et `gosu`, inutiles au serveur et vulnérables, sont retirés, `db/init.sql` est embarqué et
+MySQL tourne directement en utilisateur `mysql`.
 
-- **Require status checks to pass** : `Semgrep scan` et `Tests`. Un job supprimé ne rend
-  jamais son statut, la PR reste bloquée ;
-- **Require review from Code Owners**, avec **Dismiss stale approvals** et
-  **Require approval of the most recent reviewable push** : toute modification de
-  `.github/` doit être validée par un autre code owner ;
-- **Aucun contournement** (liste de bypass vide), y compris pour les admins ;
-- Settings → Actions : **Require approval for first-time contributors** pour les PR venant de forks.
-
-Ne jamais utiliser `pull_request_target` pour exécuter le code d'une PR : il donne accès aux secrets.
+`init.sql` ne s'exécute qu'à la création du volume `db-data`. Un volume créé par MySQL 5.6 ne peut pas
+être repris par MySQL 9 : il faut le supprimer (`docker compose down -v`) ou migrer les données.
 
 ## Release
 
 À chaque release publiée (tag `vX.Y.Z` ou `vX.Y.Z-suffixe`, ex. `v0.0.2-beta`), le workflow `Release` (`.github/workflows/release.yml`) :
 
 1. vérifie le format du tag et que son commit est bien sur `main` ;
-2. construit l'image Docker et la publie sur GHCR (`ghcr.io/<owner>/<repo>:<version>`) ;
-3. génère les SBOM SPDX du code et de l'image pour cette version.
+2. construit les images Docker et les publie sur GHCR : l'application
+   (`ghcr.io/<owner>/<repo>:<version>`) et la base de données (`ghcr.io/<owner>/<repo>-db:<version>`) ;
+3. génère les SBOM SPDX du code et de l'image de l'application pour cette version.
 
-Les releases cochées « pre-release » sur GitHub ne sont pas publiées, quel que soit leur tag.
+Les releases cochées "pre-release" sur GitHub ne sont pas publiées, quel que soit leur tag.
 
 ## Déploiement sur le serveur
 
-Le serveur vérifie chaque heure s'il existe une nouvelle release (`deploy/update.sh`, lancé par un timer systemd). Si c'est le cas, il récupère l'image correspondante sur GHCR et remplace l'ancienne version avec le `docker-compose.yml` du dépôt (`image` = version publiée, `build` = construction locale pour le développement). Si la nouvelle version ne répond pas, il revient automatiquement à la précédente et ne retente pas la version défaillante.
+Le serveur vérifie chaque heure s'il existe une nouvelle release (`deploy/update.sh`, lancé par un timer systemd). Si c'est le cas, il récupère les images correspondantes sur GHCR et remplace l'ancienne version avec le `docker-compose.yml` du dépôt (`image` = version publiée, `build` = construction locale pour le développement). Si la nouvelle version ne répond pas, il revient automatiquement à la précédente et ne retente pas la version défaillante.
 
 GitHub n'a aucun accès au serveur : c'est le serveur qui vient chercher les releases.
 

@@ -5,22 +5,15 @@ cd "$(dirname "$0")/.."
 REPO="${REPO:-LucienLassalle/SDP}"
 compose=(docker compose)
 state="${STATE_DIRECTORY:-deploy}"
+# Écrit par sdp-check.service, déjà validé
+latest_file="${LATEST_TAG_FILE:-/var/lib/sdp-check/latest-tag}"
 
-auth=()
 if [ -n "${GH_TOKEN:-}" ]; then
-  auth=(-H "Authorization: Bearer $GH_TOKEN")
   # Identifiants enregistrés dans DOCKER_CONFIG (StateDirectory du service)
   echo "$GH_TOKEN" | docker login ghcr.io -u "${GH_USER:-${REPO%%/*}}" --password-stdin >/dev/null
 fi
 
-latest=$(curl -fsS "${auth[@]}" -H "Accept: application/vnd.github+json" \
-  "https://api.github.com/repos/$REPO/releases/latest" \
-  | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)
-
-if ! [[ "$latest" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$ ]]; then
-  echo "Release introuvable ou tag invalide : '$latest'"
-  exit 1
-fi
+latest=$(cat "$latest_file")
 
 current=$(cat "$state/.current-tag" 2>/dev/null || true)
 failed=$(cat "$state/.failed-tag" 2>/dev/null || true)

@@ -1,20 +1,18 @@
 [Unit]
-Description=SDP - déploiement de la dernière release
-After=docker.service network-online.target
-Requires=docker.service
+Description=SDP - recherche de la dernière release sur GitHub
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=oneshot
-WorkingDirectory=/opt/sdp
+User=sdp-check
+Group=sdp-check
 EnvironmentFile=-/opt/sdp/deploy/.env
-ExecStart=/bin/bash /opt/sdp/deploy/update.sh
-# Utilisateur éphémère, seulement membre du groupe docker
-DynamicUser=yes
-SupplementaryGroups=docker
-# /var/lib/sdp : versions déployées et identifiants GHCR
-StateDirectory=sdp
-Environment=DOCKER_CONFIG=%S/sdp/docker
-UMask=0077
+ExecStart=/bin/bash /opt/sdp/deploy/check.sh
+# /var/lib/sdp-check/latest-tag est lu par sdp-deploy (le tag est public)
+StateDirectory=sdp-check
+StateDirectoryMode=0755
+UMask=0022
 ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes

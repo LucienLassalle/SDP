@@ -1,0 +1,10 @@
+[Unit]
+Description=SDP - recherche et déploiement des releases chaque heure
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=1h
+Unit=sdp-deploy.service
+
+[Install]
+WantedBy=timers.target

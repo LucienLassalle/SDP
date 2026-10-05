@@ -3,8 +3,16 @@
 ## Démarrage
 
 ```bash
-docker compose up --build
+SESSION_SECRET=<secret> docker compose up -d --build
 ```
+
+Le site est servi en HTTPS uniquement : https://localhost (port `HTTPS_PORT`, 443 par défaut).
+
+Au démarrage, le service `tls` (`tls/Dockerfile`, Alpine + openssl) crée un certificat autosigné dans le volume
+`tls` s'il manque ou expire dans moins de 30 jours, puis s'arrête. L'application le lit en lecture seule ; la clé
+n'est jamais dans une image ni dans le dépôt. Le certificat couvre `localhost` et `127.0.0.1` : pour un autre nom,
+définir `TLS_SAN` (ex. `TLS_SAN=DNS:sdp.example.org,IP:192.0.2.10`) et supprimer le volume `tls` pour le régénérer.
+Le navigateur affiche un avertissement, normal pour un certificat autosigné.
 
 ## CI
 
@@ -15,12 +23,12 @@ et à la demande. Chaque étape ne démarre que si la précédente a réussi :
    (`--config auto --error`), rapport SARIF publié comme artefact. La moindre alerte bloque la PR.
 2. **Tests**, sur la VM jetable fournie par GitHub, avec les tests de
    [SDP-Tests](https://github.com/LucienLassalle/SDP-Tests) :
-   1. construction des images Docker du compose (application et base de données) ;
+   1. construction des images Docker du compose (application, base de données, certificat) ;
    2. analyses statiques (`pytest -m static`) : Trivy sur le code et sur chaque image
       (vulnérabilités, secrets, mauvaises configurations), KICS sur `docker-compose.yml`
       et `systemd-analyze security` sur `deploy/*.service`. Si elles échouent,
       l'application n'est pas déployée ;
-   3. démarrage de l'application avec `docker compose` ;
+   3. démarrage de l'application avec `docker compose`, en HTTPS ;
    4. tests fonctionnels (`pytest -m functional`) ;
    5. arrêt de l'application (la VM est de toute façon détruite).
 
@@ -43,7 +51,8 @@ MySQL tourne directement en utilisateur `mysql`.
 
 1. vérifie le format du tag et que son commit est bien sur `main` ;
 2. construit les images Docker et les publie sur GHCR : l'application
-   (`ghcr.io/<owner>/<repo>:<version>`) et la base de données (`ghcr.io/<owner>/<repo>-db:<version>`) ;
+   (`ghcr.io/<owner>/<repo>:<version>`), la base de données (`ghcr.io/<owner>/<repo>-db:<version>`)
+   et le générateur de certificat (`ghcr.io/<owner>/<repo>-tls:<version>`) ;
 3. génère les SBOM SPDX du code et de l'image de l'application pour cette version.
 
 Les releases cochées "pre-release" sur GitHub ne sont pas publiées, quel que soit leur tag.

@@ -1,11 +1,21 @@
-FROM node:24.21.0-alpine
+FROM node:24.21.0-alpine AS deps
 
 WORKDIR /app
 
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
-COPY app.js ./
+FROM node:24.21.0-alpine
+
+# npm, npx, corepack et yarn ne servent qu'à l'installation
+RUN rm -rf /usr/local/lib/node_modules /opt/yarn-* \
+    /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+    /usr/local/bin/yarn /usr/local/bin/yarnpkg
+
+WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json app.js ./
 
 EXPOSE 3000
 USER node

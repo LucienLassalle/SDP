@@ -5,6 +5,8 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    mem_limit: 256m
+    pids_limit: 200
     read_only: true
     cap_drop:
       - ALL
@@ -24,6 +26,8 @@ services:
     build: ./db
     image: ghcr.io/lucienlassalle/sdp-db:${IMAGE_TAG:-dev}
     restart: unless-stopped
+    mem_limit: 1g
+    pids_limit: 200
     read_only: true
     # Seuls les fichiers temporaires et le socket MySQL sont inscriptibles (+ le volume de données)
     tmpfs:

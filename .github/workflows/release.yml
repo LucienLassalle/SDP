@@ -54,6 +54,7 @@ jobs:
           }
           publish "" .
           publish -db db
+          publish -tls tls
 
   sbom:
     name: SBOM

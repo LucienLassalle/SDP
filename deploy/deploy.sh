@@ -23,7 +23,7 @@ if [ "$latest" = "$current" ] || [ "$latest" = "$failed" ]; then
 fi
 
 echo "Mise à jour : ${current:-aucune} -> $latest"
-IMAGE_TAG="$latest" "${compose[@]}" pull web db
+IMAGE_TAG="$latest" "${compose[@]}" pull web db tls
 # --wait attend que les healthchecks des conteneurs soient au vert
 if IMAGE_TAG="$latest" "${compose[@]}" up -d --no-build --wait --wait-timeout 120; then
   echo "$latest" > "$state/.current-tag"

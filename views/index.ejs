@@ -1,17 +1,21 @@
 <%- include('partials/header', { title: 'Forum' }) %>
 <h1>Forum</h1>
 <% if (user) { -%>
-<form method="POST" action="/post">
+<form class="card" method="POST" action="/post">
   <input type="hidden" name="_csrf" value="<%= csrfToken() %>">
-  <textarea name="content" rows="3" placeholder="Votre message..."></textarea>
+  <label for="content">Nouveau message</label>
+  <textarea name="content" id="content" rows="3" placeholder="Votre message..." required></textarea>
   <button type="submit">Publier</button>
 </form>
 <% } else { -%>
 <p class="warn">Connectez-vous pour publier un message.</p>
 <% } -%>
-<hr>
 <% messages.forEach((m) => { -%>
 <div class="msg"><span class="author"><%= m.author %></span>
-  <small><%= m.created_at %></small><p><%= m.content %></p></div>
+  <time datetime="<%= new Date(m.created_at).toISOString() %>"><%= new Date(m.created_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Paris' }) %></time>
+  <p><%= m.content %></p></div>
 <% }) -%>
+<% if (messages.length === 0) { -%>
+<p class="empty">Aucun message pour l'instant.</p>
+<% } -%>
 <%- include('partials/footer') %>

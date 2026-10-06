@@ -15,6 +15,9 @@ const app = express();
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
+// Fichiers statiques (feuille de style) : aucun index de dossier, aucun fichier caché
+app.use(express.static(path.join(__dirname, 'public'), { index: false }));
+
 // Le détail de l'erreur reste dans les logs : renvoyé au client, il reflète ses entrées (XSS)
 function dbError(res, err) {
   console.error(err);

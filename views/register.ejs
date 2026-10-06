@@ -1,13 +1,19 @@
 <%- include('partials/header', { title: 'Créer un compte' }) %>
+<div class="narrow">
 <h1>Créer un compte</h1>
 <% if (locals.error) { -%>
 <p class="warn"><%= error %></p>
 <% } -%>
-<form method="POST" action="/register">
+<form class="card" method="POST" action="/register">
   <input type="hidden" name="_csrf" value="<%= csrfToken() %>">
-  <input name="username" placeholder="Identifiant (3 à 50 caractères : lettres, chiffres, . _ -)" autocomplete="username">
-  <input name="password" type="password" placeholder="Mot de passe (<%= passwordMinLength %> caractères minimum)" autocomplete="new-password">
-  <input name="confirm" type="password" placeholder="Confirmer le mot de passe" autocomplete="new-password">
+  <label for="username">Identifiant</label>
+  <input name="username" id="username" placeholder="3 à 50 caractères : lettres, chiffres, . _ -" autocomplete="username" required>
+  <label for="password">Mot de passe</label>
+  <input name="password" type="password" id="password" placeholder="<%= passwordMinLength %> caractères minimum" autocomplete="new-password" required>
+  <label for="confirm">Confirmer le mot de passe</label>
+  <input name="confirm" type="password" id="confirm" autocomplete="new-password" required>
   <button type="submit">Créer le compte</button>
 </form>
+<p class="hint">Déjà inscrit ? <a href="/login">Se connecter</a></p>
+</div>
 <%- include('partials/footer') %>

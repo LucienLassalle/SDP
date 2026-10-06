@@ -1,0 +1,13 @@
+<%- include('partials/header', { title: 'Recherche' }) %>
+<h1>Recherche</h1>
+<form method="GET"><input name="q" value="<%= locals.q %>" placeholder="Rechercher..."><button>OK</button></form>
+<% if (locals.results) { -%>
+<hr>
+<% results.forEach((r) => { -%>
+<div class="msg"><span class="author"><%= r.author %></span><p><%= r.content %></p></div>
+<% }) -%>
+<% if (results.length === 0) { -%>
+<p>Aucun résultat.</p>
+<% } -%>
+<% } -%>
+<%- include('partials/footer') %>

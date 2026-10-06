@@ -1,0 +1,13 @@
+<%- include('partials/header', { title: 'Connexion' }) %>
+<% if (locals.failed) { -%>
+<p class="warn">Identifiants invalides.</p><a href="/login">Réessayer</a>
+<% } else { -%>
+<h1>Connexion</h1>
+<form method="POST" action="/login">
+  <input type="hidden" name="_csrf" value="<%= csrfToken() %>">
+  <input name="username" placeholder="Identifiant" autocomplete="off">
+  <input name="password" type="password" placeholder="Mot de passe">
+  <button type="submit">Se connecter</button>
+</form>
+<% } -%>
+<%- include('partials/footer') %>

@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title><%= title %></title>
+<style>
+  body{font-family:system-ui,sans-serif;max-width:720px;margin:2rem auto;padding:0 1rem}
+  nav{display:flex;gap:1rem;margin-bottom:1.5rem;border-bottom:1px solid #ccc;padding-bottom:.5rem}
+  .msg{border:1px solid #ddd;border-radius:8px;padding:.75rem;margin:.5rem 0}
+  .msg .author{font-weight:bold;color:#2a5}
+  input,textarea{width:100%;padding:.5rem;margin:.25rem 0;box-sizing:border-box}
+  button{padding:.5rem 1rem;cursor:pointer}
+  .warn{background:#fee;border:1px solid #c33;padding:.5rem;border-radius:6px}
+</style></head><body>
+<nav>
+  <a href="/">Forum</a>
+  <a href="/search">Recherche</a>
+<% if (user) { -%>
+  <span>Connecté : <b><%= user.username %></b></span> <a href="/password">Mot de passe</a> <a href="/logout">Déconnexion</a>
+<% } else { -%>
+  <a href="/login">Connexion</a> <a href="/register">Créer un compte</a>
+<% } -%>
+</nav>

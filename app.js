@@ -15,10 +15,14 @@ DOMPurify.setConfig({ ALLOWED_TAGS: [], KEEP_CONTENT: true });
 
 const app = express();
 
+// Mounted as a Docker secret: never in the environment nor in the image
+const DB_PASSWORD = fs.readFileSync(process.env.DB_PASSWORD_FILE || '/run/secrets/db_password', 'utf8').trim();
+if (!DB_PASSWORD) throw new Error('DB_PASSWORD must be set');
+
 const DB_CONFIG = {
   host: process.env.DB_HOST || 'db',
-  user: 'root',
-  password: 'root_password_123',
+  user: process.env.DB_USER || 'forum',
+  password: DB_PASSWORD,
   database: 'forum'
 };
 

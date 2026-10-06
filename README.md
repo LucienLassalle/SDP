@@ -3,10 +3,21 @@
 ## Démarrage
 
 ```bash
+install -d -m 0700 secrets
+(umask 022 && openssl rand -hex 32 > secrets/db_password)
 SESSION_SECRET=<secret> docker compose up -d --build
 ```
 
-Le site est servi en HTTPS uniquement : https://localhost (port `HTTPS_PORT`, 443 par défaut).
+Le site est servi en HTTPS uniquement : https://localhost (port `HTTPS_PORT`, 443 par défaut). Il n'écoute que
+sur `127.0.0.1` : pour l'exposer, définir `HTTPS_BIND` (IP de l'interface publique, ou `0.0.0.0`).
+
+L'application se connecte à MySQL avec le compte `forum` (`SELECT` et `INSERT` sur la base `forum` uniquement).
+Son mot de passe est lu dans `secrets/db_password`, ignoré par git (ou dans le fichier indiqué par
+`DB_PASSWORD_FILE`), et monté en lecture seule dans `/run/secrets` de l'application et de MySQL : il n'apparaît ni dans
+l'environnement des conteneurs ni dans `docker inspect`. Le fichier doit être lisible par les utilisateurs des
+conteneurs (0644), c'est son dossier (0700) qui le protège sur l'hôte. Le mot de passe root est aléatoire et
+n'est pas utilisé. Un volume `db-data` créé avant ce changement ne contient pas ce compte : le recréer
+(`docker compose down -v`).
 
 Au démarrage, le service `tls` (`tls/Dockerfile`, Alpine + openssl) crée un certificat autosigné dans le volume
 `tls` s'il manque ou expire dans moins de 30 jours, puis s'arrête. L'application le lit en lecture seule ; la clé

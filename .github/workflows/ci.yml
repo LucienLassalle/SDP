@@ -97,6 +97,9 @@ jobs:
         run: |
           SESSION_SECRET=$(openssl rand -hex 32)
           export SESSION_SECRET
+          # Secret Docker : lisible par les utilisateurs mysql et node des conteneurs
+          install -d -m 0700 secrets
+          (umask 022 && openssl rand -hex 32 > secrets/db_password)
           docker compose up -d --no-build --wait --wait-timeout 120
           # Certificat autosigné généré par le service tls, pour que les tests le vérifient
           docker compose run --rm --no-deps --entrypoint cat tls /tls/cert.pem > "$RUNNER_TEMP/sdp-ca.pem"

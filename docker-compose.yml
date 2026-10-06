@@ -4,7 +4,8 @@ services:
     image: ghcr.io/lucienlassalle/sdp:${IMAGE_TAG:-dev}
     restart: unless-stopped
     ports:
-      - "${HTTPS_PORT:-443}:3443"
+      # Écoute sur localhost par défaut : HTTPS_BIND=0.0.0.0 (ou l'IP publique) pour exposer le site
+      - "${HTTPS_BIND:-127.0.0.1}:${HTTPS_PORT:-443}:3443"
     mem_limit: 256m
     pids_limit: 200
     read_only: true
@@ -14,7 +15,19 @@ services:
       - no-new-privileges:true
     environment:
       - DB_HOST=db
+      - DB_USER=forum
+      - DB_PASSWORD_FILE=/run/secrets/db_password
       - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
+    secrets:
+      - db_password
+    # La page d'accueil interroge la base : l'application n'est saine que si MySQL répond aussi
+    # (certificat autosigné : pas de vérification pour cet appel local)
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('https').get({host: '127.0.0.1', port: 3443, path: '/', rejectUnauthorized: false}, r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      start_period: 20s
+      retries: 3
     volumes:
       # Certificat créé par le service tls, hors de l'image
       - tls:/run/tls:ro
@@ -42,6 +55,12 @@ services:
       - no-new-privileges:true
     environment:
       - TLS_SAN=${TLS_SAN:-DNS:localhost,IP:127.0.0.1}
+    # Service ponctuel : sain dès que le certificat est présent
+    healthcheck:
+      test: ["CMD", "test", "-s", "/tls/cert.pem"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
     volumes:
       - tls:/tls
 
@@ -61,8 +80,20 @@ services:
     security_opt:
       - no-new-privileges:true
     environment:
-      MYSQL_ROOT_PASSWORD: root_password_123
+      # Mot de passe root aléatoire et jamais utilisé : l'application a son propre compte (init.sql)
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
       MYSQL_DATABASE: forum
+      MYSQL_USER: forum
+      MYSQL_PASSWORD_FILE: /run/secrets/db_password
+    secrets:
+      - db_password
+    # Pendant l'initialisation, MySQL n'écoute pas en TCP : le conteneur n'est sain qu'une fois prêt
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 --silent || exit 1"]
+      interval: 10s
+      timeout: 5s
+      start_period: 60s
+      retries: 5
     volumes:
       - db-data:/var/lib/mysql
     networks:
@@ -73,6 +104,11 @@ networks:
   # Réseau sans accès extérieur : seule l'application parle à la base
   backend:
     internal: true
+
+# Monté en lecture seule dans /run/secrets : absent de l'environnement et de docker inspect
+secrets:
+  db_password:
+    file: ${DB_PASSWORD_FILE:-./secrets/db_password}
 
 volumes:
   db-data:

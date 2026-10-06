@@ -6,6 +6,10 @@ CREATE DATABASE IF NOT EXISTS forum;
 ALTER DATABASE forum CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE forum;
 
+-- Compte de l'application (créé par MYSQL_USER) : lecture et ajout seulement
+REVOKE ALL PRIVILEGES ON forum.* FROM 'forum'@'%';
+GRANT SELECT, INSERT ON forum.* TO 'forum'@'%';
+
 CREATE TABLE IF NOT EXISTS users (
   id       INT AUTO_INCREMENT PRIMARY KEY,
   username VARCHAR(50) UNIQUE NOT NULL,

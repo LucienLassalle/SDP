@@ -5,7 +5,7 @@ const express = require('express');
 const session = require('express-session');
 const bodyParser = require('body-parser');
 const mysql = require('mysql2');
-const csrf = require('csurf');
+const Tokens = require('csrf');
 
 const app = express();
 
@@ -97,7 +97,19 @@ app.use(session({
   }
 }));
 
-app.use(csrf());
+const tokens = new Tokens();
+const CSRF_SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS'];
+
+// Secret kept in the session; forms send a token derived from it in the hidden _csrf field
+app.use((req, res, next) => {
+  if (!req.session.csrfSecret) req.session.csrfSecret = tokens.secretSync();
+  req.csrfToken = () => tokens.create(req.session.csrfSecret);
+  if (CSRF_SAFE_METHODS.includes(req.method)) return next();
+  if (!tokens.verify(req.session.csrfSecret, req.body?._csrf)) {
+    return res.status(403).send('Jeton CSRF invalide');
+  }
+  next();
+});
 
 function layout(title, body, user) {
   return `<!doctype html>
@@ -271,7 +283,8 @@ app.get('/search', (req, res) => {
   if (q !== undefined) {
     // % et _ cherchés tels quels, pas comme jokers
     const sql = "SELECT author, content FROM messages WHERE content LIKE CONCAT('%', ?, '%')";
-    return db.query(sql, [q.replace(/[\\%_]/g, '\\$&')], (err, rows) => {
+    // No return of db.query: Express 5 would treat the mysql2 Query (thenable) as a promise
+    db.query(sql, [q.replace(/[\\%_]/g, '\\$&')], (err, rows) => {
       if (err) return dbError(res, err);
       results = rows.map(r =>
         `<div class="msg"><span class="author">${escapeHtml(r.author)}</span><p>${escapeHtml(r.content)}</p></div>`).join('')
@@ -281,6 +294,7 @@ app.get('/search', (req, res) => {
         <form method="GET"><input name="q" value="${escapeHtml(q)}" placeholder="Rechercher..."><button>OK</button></form>
         <hr>${results}`, req.session.user));
     });
+    return;
   }
   res.send(layout('Recherche', `
     <h1>Recherche</h1>

@@ -106,16 +106,28 @@ Prérequis :
 - les plages IP de l'API GitHub sont dans `IPAddressAllow=` de `deploy/sdp-check.service`. Si GitHub les change
   (https://api.github.com/meta, clé `api`), les mettre à jour.
 
-Installation (une seule fois, en root, sur une machine avec Docker) :
+Installation automatisée (une seule fois, en root, sur Debian 13 ou compatible) :
 
 ```bash
-git clone https://github.com/LucienLassalle/SDP.git /opt/sdp
-cp /opt/sdp/deploy/sdp.sysusers /etc/sysusers.d/sdp.conf
-systemd-sysusers
-cp /opt/sdp/deploy/sdp-check.service /opt/sdp/deploy/sdp-deploy.service /opt/sdp/deploy/sdp-deploy.timer /etc/systemd/system/
-systemctl daemon-reload
-systemctl enable --now sdp-deploy.timer
+sudo apt-get update && sudo apt-get install -y curl
+curl -fsSL https://raw.githubusercontent.com/LucienLassalle/SDP/main/deploy/bootstrap.sh \
+  | sudo env TLS_SAN=DNS:localhost,IP:127.0.0.1,IP:192.168.1.118 bash
 ```
+
+Adapter `TLS_SAN` à l'adresse ou au nom utilisé pour accéder au serveur. Le script installe Docker, Compose et
+`systemd-resolved`, crée
+les secrets uniquement s'ils n'existent pas déjà, installe les services, active le timer et déclenche le premier
+déploiement. Il reprend le résolveur DHCP courant ; si nécessaire, le préciser avec `DNS_SERVER=192.168.1.254`.
+Pour une image privée, fournir aussi `GH_TOKEN` et `GH_USER` dans l'environnement du script. Les identifiants
+et secrets restent locaux à la VM et ne sont pas écrasés lors des relances.
+
+Relancer le même script met à jour le checkout `/opt/sdp`, les unités systemd et le déploiement. Une fois le
+timer installé, les images des nouvelles releases continuent d'être déployées automatiquement chaque heure.
+Après chaque déploiement réussi, le service enregistre les digests SHA-256 réellement tirés de GHCR dans
+`/var/lib/sdp-deploy/.current-digests` et les écrit dans le journal (`journalctl -u sdp-deploy`).
+À chaque vérification horaire, il contrôle que les digests des images locales n'ont pas changé depuis le
+déploiement. Le téléchargement par Docker vérifie déjà l'intégrité des blobs par digest ; le fichier permet aussi
+de comparer l'identifiant immuable de chaque image avec le digest annoncé par le workflow Release.
 
 Depuis l'ancien service `sdp-update` : `systemctl disable --now sdp-update.timer`, puis supprimer
 `/etc/systemd/system/sdp-update.*` avant l'installation ci-dessus.

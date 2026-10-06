@@ -17,6 +17,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json app.js passwords.js ./
 COPY views ./views
+COPY public ./public
 
 ENV NODE_ENV=production
 

@@ -1,0 +1,155 @@
+/* Feuille de style unique du forum, servie par express.static depuis public/ */
+
+:root {
+  color-scheme: light dark;
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --border: #e2e5ea;
+  --text: #1c1f24;
+  --muted: #646b76;
+  --accent: #2f6fde;
+  --accent-text: #ffffff;
+  --danger-bg: #fdecec;
+  --danger-border: #f3b4b4;
+  --danger-text: #8f1d1d;
+  --ok-bg: #e8f6ee;
+  --ok-border: #a9dcbd;
+  --ok-text: #17603a;
+  --radius: 10px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14161a;
+    --surface: #1d2026;
+    --border: #2e333b;
+    --text: #e7e9ec;
+    --muted: #9aa1ac;
+    --accent: #6d9cf0;
+    --accent-text: #0e1116;
+    --danger-bg: #3a1c1e;
+    --danger-border: #6b2d31;
+    --danger-text: #f3b4b4;
+    --ok-bg: #16301f;
+    --ok-border: #2c5c3c;
+    --ok-text: #a9dcbd;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* --- Barre de navigation --- */
+
+.topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .25rem 1.25rem;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: .75rem 1rem;
+}
+
+.topbar .brand { font-weight: 700; color: var(--text); }
+.topbar .spacer { flex: 1; }
+.topbar .who { color: var(--muted); }
+.topbar .who b { color: var(--text); }
+
+/* --- Contenu --- */
+
+main {
+  max-width: 760px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+h1 { margin: 0 0 1.25rem; font-size: 1.6rem; }
+
+.card,
+.msg {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  margin: 0 0 1rem;
+}
+
+.narrow { max-width: 420px; }
+
+.msg .author { font-weight: 600; }
+.msg time { color: var(--muted); font-size: .85rem; margin-left: .5rem; }
+.msg p { margin: .4rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.empty { color: var(--muted); text-align: center; padding: 2rem 0; }
+
+/* --- Formulaires --- */
+
+form { display: grid; gap: .6rem; }
+
+label { font-size: .9rem; color: var(--muted); }
+
+input,
+textarea {
+  width: 100%;
+  padding: .6rem .75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+textarea { resize: vertical; min-height: 5rem; }
+
+input:focus,
+textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+
+button {
+  justify-self: start;
+  padding: .55rem 1.1rem;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:hover { filter: brightness(1.08); }
+
+.search { grid-template-columns: 1fr auto; }
+
+.hint { margin: 1rem 0 0; color: var(--muted); font-size: .9rem; }
+
+/* --- Messages d'état --- */
+
+.warn,
+.ok {
+  border: 1px solid;
+  border-radius: 8px;
+  padding: .6rem .9rem;
+  margin: 0 0 1rem;
+}
+
+.warn { background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger-text); }
+.ok { background: var(--ok-bg); border-color: var(--ok-border); color: var(--ok-text); }

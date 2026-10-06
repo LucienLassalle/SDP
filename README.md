@@ -41,8 +41,11 @@ Le navigateur affiche un avertissement, normal pour un certificat autosigné.
 Le workflow `CI` (`.github/workflows/ci.yml`) tourne sur chaque pull request, sur `main`
 et à la demande. Chaque étape ne démarre que si la précédente a réussi :
 
-1. **Semgrep scan** : analyse du code avec les règles automatiques de Semgrep
-   (`--config auto --error`), rapport SARIF publié comme artefact. La moindre alerte bloque la PR.
+1. En parallèle, sans rien construire :
+   - **Semgrep scan** : analyse du code avec les règles automatiques de Semgrep
+     (`--config auto --error`), rapport SARIF publié comme artefact. La moindre alerte bloque la PR ;
+   - **Lint** (`pytest -m lint` de SDP-Tests) : ESLint sur le JavaScript, hadolint sur les `Dockerfile`,
+     ShellCheck sur les scripts et actionlint sur les workflows.
 2. **Tests**, sur la VM jetable fournie par GitHub, avec les tests de
    [SDP-Tests](https://github.com/LucienLassalle/SDP-Tests) :
    1. construction des images Docker du compose (application, base de données, certificat) ;

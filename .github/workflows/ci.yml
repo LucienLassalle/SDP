@@ -46,9 +46,44 @@ jobs:
           path: semgrep.sarif
           if-no-files-found: warn
 
+  lint:
+    name: Lint
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          path: sdp
+
+      - name: Check out SDP-Tests
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: LucienLassalle/SDP-Tests
+          ref: ${{ env.SDP_TESTS_REF }}
+          persist-credentials: false
+          path: sdp-tests
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.x"
+
+      - name: Install linters
+        working-directory: sdp-tests
+        run: |
+          python -m pip install -r requirements.txt
+          npm ci --ignore-scripts
+
+      - name: Linters (ESLint, hadolint, ShellCheck, actionlint)
+        working-directory: sdp-tests
+        env:
+          SDP_SRC: ${{ github.workspace }}/sdp
+        run: pytest -m lint
+
   tests:
     name: Tests
-    needs: semgrep
+    needs: [semgrep, lint]
     runs-on: ubuntu-24.04
     env:
       IMAGE_TAG: ci

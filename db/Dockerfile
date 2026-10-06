@@ -9,4 +9,4 @@ COPY init.sql /docker-entrypoint-initdb.d/
 USER mysql
 # Pendant l'initialisation, MySQL n'écoute pas en TCP : le conteneur n'est sain qu'une fois prêt
 HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=5 \
-  CMD mysqladmin ping -h 127.0.0.1 --silent || exit 1
+  CMD ["mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]

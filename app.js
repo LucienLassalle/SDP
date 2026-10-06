@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const fs = require('fs');
 const https = require('https');
 const express = require('express');
@@ -32,6 +33,45 @@ const DB_CONFIG = {
 };
 
 const db = mysql.createPool(DB_CONFIG);
+const dbp = db.promise();
+
+// scrypt de Node (aucune dépendance) avec des paramètres recommandés par l'OWASP : 32 Mio, p=3
+const SCRYPT = { N: 2 ** 15, r: 8, p: 3 };
+const SCRYPT_KEY_LENGTH = 64;
+const SCRYPT_MAXMEM = 64 * 1024 * 1024;
+
+function scrypt(password, salt, { N, r, p }) {
+  return new Promise((resolve, reject) =>
+    crypto.scrypt(password, salt, SCRYPT_KEY_LENGTH, { N, r, p, maxmem: SCRYPT_MAXMEM },
+      (err, key) => (err ? reject(err) : resolve(key))));
+}
+
+// Format stocké : scrypt$N$r$p$sel$hash (base64), pour pouvoir changer les paramètres plus tard
+async function hashPassword(password) {
+  const salt = crypto.randomBytes(16);
+  const hash = await scrypt(password, salt, SCRYPT);
+  return ['scrypt', SCRYPT.N, SCRYPT.r, SCRYPT.p, salt.toString('base64'), hash.toString('base64')].join('$');
+}
+
+async function verifyPassword(password, stored) {
+  const [algo, N, r, p, salt, hash] = String(stored).split('$');
+  if (algo !== 'scrypt' || !hash) return false;
+  const expected = Buffer.from(hash, 'base64');
+  const actual = await scrypt(password, Buffer.from(salt, 'base64'), { N: +N, r: +r, p: +p });
+  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+}
+
+const USERNAME_PATTERN = /^[A-Za-z0-9_.-]{3,50}$/;
+const PASSWORD_MIN_LENGTH = 12;
+// Borne le coût de scrypt sur des entrées géantes
+const PASSWORD_MAX_LENGTH = 256;
+
+function passwordProblem(password, confirm) {
+  if (password.length < PASSWORD_MIN_LENGTH) return `Le mot de passe doit faire au moins ${PASSWORD_MIN_LENGTH} caractères.`;
+  if (password.length > PASSWORD_MAX_LENGTH) return `Le mot de passe doit faire au plus ${PASSWORD_MAX_LENGTH} caractères.`;
+  if (password !== confirm) return 'Les mots de passe ne correspondent pas.';
+  return null;
+}
 
 app.use(bodyParser.urlencoded({ extended: false }));
 
@@ -75,7 +115,7 @@ function layout(title, body, user) {
   <a href="/">Forum</a>
   <a href="/search">Recherche</a>
   ${user ? `<span>Connecté : <b>${escapeHtml(user.username)}</b></span> <a href="/logout">Déconnexion</a>`
-         : `<a href="/login">Connexion</a>`}
+         : `<a href="/login">Connexion</a> <a href="/register">Créer un compte</a>`}
 </nav>
 ${body}
 </body></html>`;
@@ -121,19 +161,65 @@ app.get('/login', (req, res) => {
     </form>`, req.session.user));
 });
 
-app.post('/login', (req, res) => {
-  const { username, password } = req.body;
-
-  // Requête paramétrée : les entrées ne sont jamais interprétées comme du SQL
-  const sql = 'SELECT username, role FROM users WHERE username = ? AND password = ?';
-  db.query(sql, [String(username || ''), String(password || '')], (err, rows) => {
+// Nouvelle session à chaque connexion : un identifiant de session fixé avant n'est pas réutilisable
+function logIn(req, res, user) {
+  req.session.regenerate((err) => {
     if (err) return dbError(res, err);
-    if (rows.length > 0) {
-      req.session.user = { username: rows[0].username, role: rows[0].role };
-      return res.redirect('/');
-    }
-    res.send(layout('Connexion', '<p class="warn">Identifiants invalides.</p><a href="/login">Réessayer</a>', null));
+    req.session.user = { username: user.username, role: user.role };
+    res.redirect('/');
   });
+}
+
+app.post('/login', async (req, res) => {
+  const username = String(req.body.username || '');
+  const password = String(req.body.password || '').slice(0, PASSWORD_MAX_LENGTH);
+  try {
+    // Requête paramétrée : les entrées ne sont jamais interprétées comme du SQL
+    const [rows] = await dbp.query('SELECT username, password, role FROM users WHERE username = ?', [username]);
+    // Hash calculé même pour un compte inconnu : le temps de réponse ne révèle pas s'il existe
+    const valid = rows.length > 0
+      ? await verifyPassword(password, rows[0].password)
+      : (await hashPassword(password), false);
+    if (valid) return logIn(req, res, rows[0]);
+    res.send(layout('Connexion', '<p class="warn">Identifiants invalides.</p><a href="/login">Réessayer</a>', null));
+  } catch (err) {
+    dbError(res, err);
+  }
+});
+
+function registerPage(req, error) {
+  return layout('Créer un compte', `
+    <h1>Créer un compte</h1>
+    ${error ? `<p class="warn">${escapeHtml(error)}</p>` : ''}
+    <form method="POST" action="/register">
+      <input type="hidden" name="_csrf" value="${req.csrfToken()}">
+      <input name="username" placeholder="Identifiant (3 à 50 caractères : lettres, chiffres, . _ -)" autocomplete="username">
+      <input name="password" type="password" placeholder="Mot de passe (${PASSWORD_MIN_LENGTH} caractères minimum)" autocomplete="new-password">
+      <input name="confirm" type="password" placeholder="Confirmer le mot de passe" autocomplete="new-password">
+      <button type="submit">Créer le compte</button>
+    </form>`, req.session.user);
+}
+
+app.get('/register', (req, res) => {
+  res.send(registerPage(req));
+});
+
+app.post('/register', async (req, res) => {
+  const username = String(req.body.username || '');
+  const password = String(req.body.password || '');
+  const problem = USERNAME_PATTERN.test(username)
+    ? passwordProblem(password, String(req.body.confirm || ''))
+    : 'Identifiant invalide : 3 à 50 caractères parmi lettres, chiffres, . _ -';
+  if (problem) return res.status(400).send(registerPage(req, problem));
+  try {
+    const user = { username, role: 'user' };
+    await dbp.query('INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
+      [username, await hashPassword(password), user.role]);
+    logIn(req, res, user);
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') return res.status(409).send(registerPage(req, 'Cet identifiant est déjà utilisé.'));
+    dbError(res, err);
+  }
 });
 
 app.get('/logout', (req, res) => {

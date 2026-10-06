@@ -33,10 +33,8 @@ chmod 0660 "$lock_file"
 exec 9>>"$lock_file"
 flock 9
 
-sync_source=false
 current=$(cat "$state/source-tag" 2>/dev/null || true)
 if [ "$latest" != "$current" ]; then
-  sync_source=true
   work=$(mktemp -d "$state/work.XXXXXX")
   trap 'rm -rf "$work"' EXIT
   archive="$work/source.zip"

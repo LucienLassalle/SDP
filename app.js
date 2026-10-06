@@ -5,15 +5,20 @@ const session = require('express-session');
 const bodyParser = require('body-parser');
 const mysql = require('mysql2');
 const csrf = require('csurf');
-const createDOMPurify = require('dompurify');
-const { JSDOM } = require('jsdom');
-
-const DOMPurify = createDOMPurify(new JSDOM('').window);
-
-// Every tag stripped, text kept with &, < and > escaped
-DOMPurify.setConfig({ ALLOWED_TAGS: [], KEEP_CONTENT: true });
 
 const app = express();
+
+// Toute valeur insérée dans le HTML (texte ou attribut) passe par ici
+const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, c => HTML_ESCAPES[c]);
+}
+
+// Le détail de l'erreur reste dans les logs : renvoyé au client, il reflète ses entrées (XSS)
+function dbError(res, err) {
+  console.error(err);
+  res.status(500).send('Erreur interne.');
+}
 
 // Mounted as a Docker secret: never in the environment nor in the image
 const DB_PASSWORD = fs.readFileSync(process.env.DB_PASSWORD_FILE || '/run/secrets/db_password', 'utf8').trim();
@@ -71,7 +76,7 @@ function layout(title, body, user) {
 <nav>
   <a href="/">Forum</a>
   <a href="/search">Recherche</a>
-  ${user ? `<span>Connecté : <b>${user.username}</b></span> <a href="/logout">Déconnexion</a>`
+  ${user ? `<span>Connecté : <b>${escapeHtml(user.username)}</b></span> <a href="/logout">Déconnexion</a>`
          : `<a href="/login">Connexion</a>`}
 </nav>
 ${body}
@@ -81,10 +86,10 @@ ${body}
 app.get('/', (req, res) => {
   db.query('SELECT m.id, m.author, m.content, m.created_at FROM messages m ORDER BY m.id DESC',
     (err, rows) => {
-      if (err) return res.status(500).send('Erreur BDD : ' + err.message);
+      if (err) return dbError(res, err);
       const list = rows.map(r =>
-        `<div class="msg"><span class="author">${r.author}</span>
-         <small>${r.created_at}</small><p>${r.content}</p></div>`).join('');
+        `<div class="msg"><span class="author">${escapeHtml(r.author)}</span>
+         <small>${escapeHtml(r.created_at)}</small><p>${escapeHtml(r.content)}</p></div>`).join('');
       const form = req.session.user
         ? `<form method="POST" action="/post">
              <input type="hidden" name="_csrf" value="${req.csrfToken()}">
@@ -102,7 +107,7 @@ app.post('/post', (req, res) => {
   const content = req.body.content || '';
   const sql = 'INSERT INTO messages (author, content) VALUES (?, ?)';
   db.query(sql, [author, content], (err) => {
-    if (err) return res.status(500).send('Erreur BDD : ' + err.message);
+    if (err) return dbError(res, err);
     res.redirect('/');
   });
 });
@@ -129,7 +134,7 @@ app.post('/login', (req, res) => {
   // Requête paramétrée : les entrées ne sont jamais interprétées comme du SQL
   const sql = 'SELECT username, role FROM users WHERE username = ? AND password = ?';
   db.query(sql, [String(username || ''), String(password || '')], (err, rows) => {
-    if (err) return res.status(500).send('Erreur BDD : ' + err.message);
+    if (err) return dbError(res, err);
     if (rows.length > 0) {
       req.session.user = { username: rows[0].username, role: rows[0].role };
       return res.redirect('/');
@@ -150,15 +155,13 @@ app.get('/search', (req, res) => {
     // % et _ cherchés tels quels, pas comme jokers
     const sql = "SELECT author, content FROM messages WHERE content LIKE CONCAT('%', ?, '%')";
     return db.query(sql, [q.replace(/[\\%_]/g, '\\$&')], (err, rows) => {
-      if (err) return res.status(500).send('Erreur BDD : ' + err.message);
+      if (err) return dbError(res, err);
       results = rows.map(r =>
-        `<div class="msg"><span class="author">${DOMPurify.sanitize(r.author)}</span><p>${DOMPurify.sanitize(r.content)}</p></div>`).join('')
+        `<div class="msg"><span class="author">${escapeHtml(r.author)}</span><p>${escapeHtml(r.content)}</p></div>`).join('')
         || '<p>Aucun résultat.</p>';
-      // DOMPurify does not escape quotes in text, required inside value="..."
-      const qAttr = DOMPurify.sanitize(q).replace(/"/g, '&quot;');
       res.send(layout('Recherche', `
         <h1>Recherche</h1>
-        <form method="GET"><input name="q" value="${qAttr}" placeholder="Rechercher..."><button>OK</button></form>
+        <form method="GET"><input name="q" value="${escapeHtml(q)}" placeholder="Rechercher..."><button>OK</button></form>
         <hr>${results}`, req.session.user));
     });
   }

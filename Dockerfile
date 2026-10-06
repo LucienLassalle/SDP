@@ -1,11 +1,11 @@
-FROM node:24.21.0-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS deps
+FROM node:26.10.0-alpine@sha256:0b36e8c136b94cd4fcf02188228e76c31ad5872eef3fec8cbd2eee500cfd9e80 AS deps
 
 WORKDIR /app
 
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
-FROM node:24.21.0-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1
+FROM node:26.10.0-alpine@sha256:0b36e8c136b94cd4fcf02188228e76c31ad5872eef3fec8cbd2eee500cfd9e80
 
 # npm, npx, corepack et yarn ne servent qu'à l'installation
 RUN rm -rf /usr/local/lib/node_modules /opt/yarn-* \
@@ -15,7 +15,9 @@ RUN rm -rf /usr/local/lib/node_modules /opt/yarn-* \
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
-COPY package.json app.js ./
+COPY package.json app.js passwords.js ./
+COPY views ./views
+COPY public ./public
 
 ENV NODE_ENV=production
 

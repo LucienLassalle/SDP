@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %> · SDP</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="topbar">
+  <nav>
+    <a class="brand" href="/">Forum</a>
+    <a href="/search">Recherche</a>
+    <span class="spacer"></span>
+<% if (user) { -%>
+    <span class="who">Connecté : <b><%= user.username %></b></span>
+    <a href="/password">Mot de passe</a>
+    <a href="/logout">Déconnexion</a>
+<% } else { -%>
+    <a href="/login">Connexion</a>
+    <a href="/register">Créer un compte</a>
+<% } -%>
+  </nav>
+</header>
+<main>

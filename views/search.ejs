@@ -1,0 +1,15 @@
+<%- include('partials/header', { title: 'Recherche' }) %>
+<h1>Recherche</h1>
+<form class="card search" method="GET" action="/search" role="search">
+  <input name="q" value="<%= locals.q %>" placeholder="Rechercher dans les messages..." aria-label="Rechercher">
+  <button type="submit">Rechercher</button>
+</form>
+<% if (locals.results) { -%>
+<% results.forEach((r) => { -%>
+<div class="msg"><span class="author"><%= r.author %></span><p><%= r.content %></p></div>
+<% }) -%>
+<% if (results.length === 0) { -%>
+<p class="empty">Aucun résultat.</p>
+<% } -%>
+<% } -%>
+<%- include('partials/footer') %>

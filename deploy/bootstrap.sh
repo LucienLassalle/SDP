@@ -6,7 +6,7 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 1
 fi
 
-repo="${REPO:-https://github.com/LucienLassalle/SDP.git}"
+repo="${REPO:-LucienLassalle/SDP}"
 install_dir=/opt/sdp
 env_file="$install_dir/deploy/.env"
 
@@ -44,28 +44,88 @@ fi
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y curl docker-compose docker.io git openssl systemd-resolved
+apt-get install -y curl docker-compose docker.io openssl rsync systemd-resolved unzip util-linux
 
 systemctl enable --now docker.service systemd-resolved.service
 install -d -m 0755 /etc/systemd/resolved.conf.d
 printf '[Resolve]\nDNS=%s\n' "$dns_server" > /etc/systemd/resolved.conf.d/sdp.conf
 systemctl restart systemd-resolved.service
 
-if [ -d "$install_dir/.git" ]; then
-  git -C "$install_dir" pull --ff-only origin main
-elif [ -e "$install_dir" ]; then
-  echo "$install_dir existe mais n'est pas un dépôt Git." >&2
+if ! [[ "$repo" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+  echo "REPO invalide : '$repo'" >&2
   exit 1
-else
-  git clone --branch main "$repo" "$install_dir"
 fi
 
-cd "$install_dir"
-install -d -m 0700 secrets /etc/sysusers.d
-if [ ! -s secrets/db_password ]; then
-  (umask 077; openssl rand -hex 32 > secrets/db_password)
+auth=()
+if [ -n "${GH_TOKEN:-}" ]; then
+  auth=(-H "Authorization: Bearer $GH_TOKEN")
 fi
-chmod 0644 secrets/db_password
+latest=$(curl -fsS --retry 3 "${auth[@]}" -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/repos/$repo/releases/latest" \
+  | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)
+if ! [[ "$latest" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$ ]]; then
+  echo "Release introuvable ou tag invalide : '$latest'" >&2
+  exit 1
+fi
+
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+curl -fsS --retry 3 -D "$work/headers" -o /dev/null \
+  -H "Accept: application/vnd.github+json" "${auth[@]}" \
+  "https://api.github.com/repos/$repo/zipball/$latest"
+location=$(awk 'tolower($1) == "location:" { sub(/^[^:]*:[[:space:]]*/, ""); sub(/\r$/, ""); value=$0 } END { print value }' "$work/headers")
+expected_location="https://codeload.github.com/$repo/legacy.zip/refs/tags/$latest"
+if [ "$location" != "$expected_location" ]; then
+  echo "URL d'archive GitHub inattendue : '$location'" >&2
+  exit 1
+fi
+curl -fsS --retry 3 "${auth[@]}" "$location" -o "$work/source.zip"
+unzip -tq "$work/source.zip"
+unzip -Z1 "$work/source.zip" > "$work/entries"
+archive_root=""
+while IFS= read -r entry; do
+  if [[ "$entry" = /* || "$entry" == *../* || "$entry" == ../* || "$entry" == *\\* ]]; then
+    echo "Chemin invalide dans l'archive : '$entry'" >&2
+    exit 1
+  fi
+  root="${entry%%/*}"
+  if [ -z "$archive_root" ]; then
+    archive_root="$root"
+  elif [ "$root" != "$archive_root" ]; then
+    echo "L'archive contient plusieurs racines." >&2
+    exit 1
+  fi
+done < "$work/entries"
+expected_root="${repo//\//-}"
+if [ -z "$archive_root" ] || [[ "$archive_root" != "$expected_root-"* ]]; then
+  echo "Racine d'archive inattendue : '$archive_root'" >&2
+  exit 1
+fi
+mkdir "$work/extracted"
+unzip -q "$work/source.zip" -d "$work/extracted"
+source_dir="$work/extracted/$archive_root"
+for required in docker-compose.yml deploy/sdp.sysusers deploy/sdp-check.service \
+  deploy/sdp-deploy.service deploy/sdp-deploy.timer deploy/sdp-release-sync.service \
+  deploy/sync-release.sh; do
+  if [ ! -f "$source_dir/$required" ]; then
+    echo "Fichier requis absent de la release $latest : $required" >&2
+    exit 1
+  fi
+done
+install -d -m 0755 "$install_dir" /etc/sysusers.d
+install -d -m 0755 /usr/local/libexec
+rsync -a --delete --safe-links \
+  --exclude='/.git/' --exclude='/secrets/' --exclude='/deploy/.env' \
+  "$source_dir/" "$install_dir/"
+if [ -d "$install_dir/.git" ] || [ -L "$install_dir/.git" ]; then
+  rm -rf -- "$install_dir/.git"
+fi
+
+install -d -m 0700 "$install_dir/secrets"
+if [ ! -s "$install_dir/secrets/db_password" ]; then
+  (umask 077; openssl rand -hex 32 > "$install_dir/secrets/db_password")
+fi
+chmod 0644 "$install_dir/secrets/db_password"
 
 if [ ! -e "$env_file" ]; then
   session_secret="${SESSION_SECRET:-$(openssl rand -hex 32)}"
@@ -93,17 +153,21 @@ if [ ! -e "$env_file" ]; then
 fi
 chmod 0600 "$env_file"
 
-install -m 0644 deploy/sdp.sysusers /etc/sysusers.d/sdp.conf
+install -m 0644 "$install_dir/deploy/sdp.sysusers" /etc/sysusers.d/sdp.conf
 systemd-sysusers
-install -m 0644 deploy/sdp-check.service deploy/sdp-deploy.service \
-  deploy/sdp-deploy.timer /etc/systemd/system/
+for unit in "$install_dir"/deploy/sdp-*.service "$install_dir"/deploy/sdp-*.timer; do
+  [ -f "$unit" ] || continue
+  install -m 0644 "$unit" "/etc/systemd/system/$(basename "$unit")"
+done
+install -m 0755 "$install_dir/deploy/sync-release.sh" /usr/local/libexec/sdp-release-sync
 systemctl daemon-reload
-systemd-analyze verify /etc/systemd/system/sdp-check.service \
-  /etc/systemd/system/sdp-deploy.service /etc/systemd/system/sdp-deploy.timer
+systemd-analyze verify /etc/systemd/system/sdp-*.service /etc/systemd/system/sdp-*.timer
 
 docker compose version >/dev/null
 getent hosts api.github.com >/dev/null
 systemctl enable --now sdp-deploy.timer
-systemctl start sdp-deploy.service
+systemctl restart sdp-deploy.timer
+systemctl start sdp-release-sync.service
 
-echo "Installation terminée. Version déployée : $(cat /var/lib/sdp-deploy/.current-tag)"
+echo "Installation terminée. Release synchronisée : $(cat /var/lib/sdp-release-sync/source-tag)"
+echo "Image déployée : $(cat /var/lib/sdp-deploy/.current-tag)"

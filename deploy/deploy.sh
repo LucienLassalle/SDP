@@ -7,6 +7,19 @@ compose=(docker compose)
 state="${STATE_DIRECTORY:-deploy}"
 # Écrit par sdp-check.service, déjà validé
 latest_file="${LATEST_TAG_FILE:-/var/lib/sdp-check/latest-tag}"
+sync_lock="${SYNC_LOCK_FILE:-/var/lib/sdp-release-sync/deploy.lock}"
+sync_in_progress="${SYNC_IN_PROGRESS_FILE:-/var/lib/sdp-release-sync/in-progress}"
+
+if [ ! -e "$sync_lock" ]; then
+  echo "Verrou de synchronisation absent : $sync_lock" >&2
+  exit 1
+fi
+exec 9>>"$sync_lock"
+flock 9
+if [ -e "$sync_in_progress" ]; then
+  echo "Synchronisation de release incomplète ; déploiement suspendu." >&2
+  exit 1
+fi
 
 if [ -n "${GH_TOKEN:-}" ]; then
   # Identifiants enregistrés dans DOCKER_CONFIG (StateDirectory du service)

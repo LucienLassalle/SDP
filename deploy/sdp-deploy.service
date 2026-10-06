@@ -6,16 +6,19 @@ Requires=docker.service sdp-check.service
 [Service]
 Type=oneshot
 User=sdp-deploy
-# Seul groupe du service : accès au socket Docker
+# Groupe docker pour le socket et sdp-deploy pour le verrou partagé
 Group=docker
+SupplementaryGroups=sdp-deploy
 WorkingDirectory=/opt/sdp
 EnvironmentFile=-/opt/sdp/deploy/.env
+Environment=LATEST_TAG_FILE=/var/lib/sdp-release-sync/source-tag
 ExecStart=/bin/bash /opt/sdp/deploy/deploy.sh
 # /var/lib/sdp-deploy : versions déployées et identifiants GHCR
 StateDirectory=sdp-deploy
 Environment=DOCKER_CONFIG=%S/sdp-deploy/docker
 UMask=0077
 ProtectSystem=strict
+ReadWritePaths=-/var/lib/sdp-release-sync/deploy.lock
 ProtectHome=yes
 # Espace utilisateurs isolé : seuls le service et son groupe sont visibles
 PrivateUsers=yes

@@ -31,8 +31,6 @@ const DB_CONFIG = {
   database: 'forum'
 };
 
-const HARDCODED_ADMIN = { username: 'admin', password: 'admin123' };
-
 const db = mysql.createPool(DB_CONFIG);
 
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -125,11 +123,6 @@ app.get('/login', (req, res) => {
 
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
-
-  if (username === HARDCODED_ADMIN.username && password === HARDCODED_ADMIN.password) {
-    req.session.user = { username, role: 'admin' };
-    return res.redirect('/');
-  }
 
   // Requête paramétrée : les entrées ne sont jamais interprétées comme du SQL
   const sql = 'SELECT username, role FROM users WHERE username = ? AND password = ?';

@@ -126,8 +126,9 @@ app.post('/login', (req, res) => {
     return res.redirect('/');
   }
 
-  const sql = `SELECT * FROM users WHERE username = '${username}' AND password = '${password}'`;
-  db.query(sql, (err, rows) => {
+  // Requête paramétrée : les entrées ne sont jamais interprétées comme du SQL
+  const sql = 'SELECT username, role FROM users WHERE username = ? AND password = ?';
+  db.query(sql, [String(username || ''), String(password || '')], (err, rows) => {
     if (err) return res.status(500).send('Erreur BDD : ' + err.message);
     if (rows.length > 0) {
       req.session.user = { username: rows[0].username, role: rows[0].role };
@@ -142,11 +143,13 @@ app.get('/logout', (req, res) => {
 });
 
 app.get('/search', (req, res) => {
-  const q = req.query.q;
+  // ?q=a&q=b donne un tableau, que mysql2 développerait en liste de valeurs
+  const q = typeof req.query.q === 'string' ? req.query.q : undefined;
   let results = '';
   if (q !== undefined) {
-    const sql = `SELECT author, content FROM messages WHERE content LIKE '%${q}%'`;
-    return db.query(sql, (err, rows) => {
+    // % et _ cherchés tels quels, pas comme jokers
+    const sql = "SELECT author, content FROM messages WHERE content LIKE CONCAT('%', ?, '%')";
+    return db.query(sql, [q.replace(/[\\%_]/g, '\\$&')], (err, rows) => {
       if (err) return res.status(500).send('Erreur BDD : ' + err.message);
       results = rows.map(r =>
         `<div class="msg"><span class="author">${DOMPurify.sanitize(r.author)}</span><p>${DOMPurify.sanitize(r.content)}</p></div>`).join('')

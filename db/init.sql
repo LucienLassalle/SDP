@@ -24,13 +24,5 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT INTO users (username, password, role) VALUES
-  ('alice',   'password1',   'user'),
-  ('bob',     'qwerty',      'user'),
-  ('charlie', 'letmein',     'user'),
-  ('root',    'toor',        'admin');
-
-INSERT INTO messages (author, content) VALUES
-  ('alice',   'Bienvenue sur le forum du TP sécurité !'),
-  ('bob',     'Quelqu''un a testé la page de recherche ?'),
-  ('charlie', 'Pensez à bien documenter les failles trouvées.');
+-- Changement de mot de passe : seule la colonne password peut être modifiée
+GRANT UPDATE (password) ON forum.users TO 'forum'@'%';

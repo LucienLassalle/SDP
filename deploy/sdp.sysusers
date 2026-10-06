@@ -1,0 +1,4 @@
+# Un utilisateur système par service, sans shell ni home
+#Type Name       ID GECOS
+u     sdp-check  -  "SDP - recherche des releases"
+u     sdp-deploy -  "SDP - déploiement des releases"

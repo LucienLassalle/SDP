@@ -33,7 +33,7 @@ jobs:
           python-version: "3.x"
 
       - name: Install Semgrep
-        run: python -m pip install semgrep
+        run: python -m pip install semgrep==1.178.0
 
       - name: Run Semgrep
         run: semgrep scan --config auto --error --sarif-output=semgrep.sarif .
@@ -82,8 +82,9 @@ jobs:
       - name: Install test dependencies
         run: python -m pip install -r sdp-tests/requirements.txt
 
-      - name: Build Docker image
-        run: docker build -t "$SDP_IMAGE" sdp
+      - name: Build Docker images
+        working-directory: sdp
+        run: SESSION_SECRET=unused docker compose build
 
       - name: Analyses statiques (Trivy, systemd)
         working-directory: sdp-tests
@@ -96,13 +97,18 @@ jobs:
         run: |
           SESSION_SECRET=$(openssl rand -hex 32)
           export SESSION_SECRET
-          docker compose up -d --no-build
+          # Secret Docker : lisible par les utilisateurs mysql et node des conteneurs
+          install -d -m 0700 secrets
+          (umask 022 && openssl rand -hex 32 > secrets/db_password)
+          docker compose up -d --no-build --wait --wait-timeout 120
+          # Certificat autosigné généré par le service tls, pour que les tests le vérifient
+          docker compose run --rm --no-deps --entrypoint cat tls /tls/cert.pem > "$RUNNER_TEMP/sdp-ca.pem"
 
       - name: Tests fonctionnels
         working-directory: sdp-tests
         env:
-          SDP_URL: http://localhost:3000
-        run: pytest -m functional
+          SDP_URL: https://localhost
+        run: REQUESTS_CA_BUNDLE="$RUNNER_TEMP/sdp-ca.pem" pytest -m functional
 
       - name: Logs de l'application
         if: failure()

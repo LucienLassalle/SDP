@@ -1,7 +1,9 @@
+const fs = require('fs');
+const https = require('https');
 const express = require('express');
 const session = require('express-session');
 const bodyParser = require('body-parser');
-const mysql = require('mysql');
+const mysql = require('mysql2');
 const csrf = require('csurf');
 const createDOMPurify = require('dompurify');
 const { JSDOM } = require('jsdom');
@@ -13,10 +15,14 @@ DOMPurify.setConfig({ ALLOWED_TAGS: [], KEEP_CONTENT: true });
 
 const app = express();
 
+// Mounted as a Docker secret: never in the environment nor in the image
+const DB_PASSWORD = fs.readFileSync(process.env.DB_PASSWORD_FILE || '/run/secrets/db_password', 'utf8').trim();
+if (!DB_PASSWORD) throw new Error('DB_PASSWORD must be set');
+
 const DB_CONFIG = {
   host: process.env.DB_HOST || 'db',
-  user: 'root',
-  password: 'root_password_123',
+  user: process.env.DB_USER || 'forum',
+  password: DB_PASSWORD,
   database: 'forum'
 };
 
@@ -159,5 +165,12 @@ app.get('/search', (req, res) => {
     req.session.user));
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log('Forum (vulnérable) démarré sur le port ' + PORT));
+// HTTPS obligatoire : le cookie de session est secure, il n'est jamais envoyé en HTTP
+const TLS_DIR = process.env.TLS_DIR || '/run/tls';
+const tls = {
+  key: fs.readFileSync(TLS_DIR + '/key.pem'),
+  cert: fs.readFileSync(TLS_DIR + '/cert.pem')
+};
+
+const PORT = process.env.PORT || 3443;
+https.createServer(tls, app).listen(PORT, () => console.log('Forum (vulnérable) démarré en HTTPS sur le port ' + PORT));

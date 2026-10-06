@@ -43,22 +43,31 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.event.release.tag_name }}
         run: |
-          image="ghcr.io/${GITHUB_REPOSITORY,,}:${TAG}"
-          docker build -t "$image" .
           echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-          docker push "$image"
-          digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$image")
-          echo "Image publiée : \`$digest\`" >> "$GITHUB_STEP_SUMMARY"
+          # $1 = suffixe du nom de l'image, $2 = dossier du Dockerfile
+          publish() {
+            image="ghcr.io/${GITHUB_REPOSITORY,,}$1:${TAG}"
+            docker build -t "$image" "$2"
+            docker push "$image"
+            digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$image")
+            echo "Image publiée : \`$digest\`" >> "$GITHUB_STEP_SUMMARY"
+          }
+          publish "" .
+          publish -db db
+          publish -tls tls
 
   sbom:
     name: SBOM
     if: ${{ !github.event.release.prerelease }}
     runs-on: ubuntu-latest
+    environment: production
     permissions:
       contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Anchore SBOM Action (code)
         uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3

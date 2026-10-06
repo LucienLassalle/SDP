@@ -114,7 +114,7 @@ function layout(title, body, user) {
 <nav>
   <a href="/">Forum</a>
   <a href="/search">Recherche</a>
-  ${user ? `<span>Connecté : <b>${escapeHtml(user.username)}</b></span> <a href="/logout">Déconnexion</a>`
+  ${user ? `<span>Connecté : <b>${escapeHtml(user.username)}</b></span> <a href="/password">Mot de passe</a> <a href="/logout">Déconnexion</a>`
          : `<a href="/login">Connexion</a> <a href="/register">Créer un compte</a>`}
 </nav>
 ${body}
@@ -222,6 +222,44 @@ app.post('/register', async (req, res) => {
   }
 });
 
+function passwordPage(req, error, done) {
+  return layout('Mot de passe', `
+    <h1>Changer de mot de passe</h1>
+    ${error ? `<p class="warn">${escapeHtml(error)}</p>` : ''}
+    ${done ? '<p>Mot de passe modifié.</p>' : ''}
+    <form method="POST" action="/password">
+      <input type="hidden" name="_csrf" value="${req.csrfToken()}">
+      <input name="current" type="password" placeholder="Mot de passe actuel" autocomplete="current-password">
+      <input name="password" type="password" placeholder="Nouveau mot de passe (${PASSWORD_MIN_LENGTH} caractères minimum)" autocomplete="new-password">
+      <input name="confirm" type="password" placeholder="Confirmer le nouveau mot de passe" autocomplete="new-password">
+      <button type="submit">Changer</button>
+    </form>`, req.session.user);
+}
+
+app.get('/password', (req, res) => {
+  if (!req.session.user) return res.redirect('/login');
+  res.send(passwordPage(req));
+});
+
+app.post('/password', async (req, res) => {
+  if (!req.session.user) return res.redirect('/login');
+  const { username } = req.session.user;
+  const current = String(req.body.current || '').slice(0, PASSWORD_MAX_LENGTH);
+  const password = String(req.body.password || '');
+  try {
+    const [rows] = await dbp.query('SELECT password FROM users WHERE username = ?', [username]);
+    if (rows.length === 0 || !(await verifyPassword(current, rows[0].password))) {
+      return res.status(403).send(passwordPage(req, 'Mot de passe actuel incorrect.'));
+    }
+    const problem = passwordProblem(password, String(req.body.confirm || ''));
+    if (problem) return res.status(400).send(passwordPage(req, problem));
+    await dbp.query('UPDATE users SET password = ? WHERE username = ?', [await hashPassword(password), username]);
+    res.send(passwordPage(req, null, true));
+  } catch (err) {
+    dbError(res, err);
+  }
+});
+
 app.get('/logout', (req, res) => {
   req.session.destroy(() => res.redirect('/'));
 });
@@ -274,7 +312,7 @@ async function createAdminIfNoAccount() {
     'Aucun compte existant : compte administrateur créé.',
     '  Identifiant  : admin',
     `  Mot de passe : ${password}`,
-    "Il n'est affiché qu'une fois : changez-le après la première connexion."
+    "Il n'est affiché qu'une fois : changez-le après la première connexion (/password)."
   ].join('\n'));
 }
 

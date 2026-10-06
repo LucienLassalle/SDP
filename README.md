@@ -11,7 +11,8 @@ SESSION_SECRET=<secret> docker compose up -d --build
 Le site est servi en HTTPS uniquement : https://localhost (port `HTTPS_PORT`, 443 par défaut). Il n'écoute que
 sur `127.0.0.1` : pour l'exposer, définir `HTTPS_BIND` (IP de l'interface publique, ou `0.0.0.0`).
 
-L'application se connecte à MySQL avec le compte `forum` (`SELECT` et `INSERT` sur la base `forum` uniquement).
+L'application se connecte à MySQL avec le compte `forum` (`SELECT` et `INSERT` sur la base `forum`, `UPDATE` sur la
+seule colonne `users.password`).
 Son mot de passe est lu dans `secrets/db_password`, ignoré par git (ou dans le fichier indiqué par
 `DB_PASSWORD_FILE`), et monté en lecture seule dans `/run/secrets` de l'application et de MySQL : il n'apparaît ni dans
 l'environnement des conteneurs ni dans `docker inspect`. Le fichier doit être lisible par les utilisateurs des
@@ -19,8 +20,8 @@ conteneurs (0644), c'est son dossier (0700) qui le protège sur l'hôte. Le mot 
 n'est pas utilisé. Un volume `db-data` créé avant ce changement ne contient pas ce compte : le recréer
 (`docker compose down -v`).
 
-Le forum démarre sans compte ni message. Chacun crée son compte sur `/register` ; les mots de passe sont hachés
-avec scrypt. Si la base ne contient aucun compte au démarrage,
+Le forum démarre sans compte ni message. Chacun crée son compte sur `/register` et peut changer son mot de passe
+sur `/password` ; les mots de passe sont hachés avec scrypt. Si la base ne contient aucun compte au démarrage,
 l'application crée un compte `admin` avec un mot de passe aléatoire, affiché une seule fois dans ses logs :
 
 ```bash

@@ -23,3 +23,6 @@ CREATE TABLE IF NOT EXISTS messages (
   content    TEXT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Changement de mot de passe : seule la colonne password peut être modifiée
+GRANT UPDATE (password) ON forum.users TO 'forum'@'%';

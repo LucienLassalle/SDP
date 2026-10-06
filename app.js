@@ -257,5 +257,31 @@ const tls = {
   cert: fs.readFileSync(TLS_DIR + '/cert.pem')
 };
 
+// Aucun compte en base : création d'un admin au mot de passe aléatoire, affiché une seule fois dans les logs
+async function createAdminIfNoAccount() {
+  const [[{ count }]] = await dbp.query('SELECT COUNT(*) AS count FROM users');
+  if (count > 0) return;
+  const password = crypto.randomBytes(18).toString('base64url');
+  try {
+    await dbp.query('INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
+      ['admin', await hashPassword(password), 'admin']);
+  } catch (err) {
+    // Une autre instance l'a créé en même temps
+    if (err.code === 'ER_DUP_ENTRY') return;
+    throw err;
+  }
+  console.log([
+    'Aucun compte existant : compte administrateur créé.',
+    '  Identifiant  : admin',
+    `  Mot de passe : ${password}`,
+    "Il n'est affiché qu'une fois : changez-le après la première connexion."
+  ].join('\n'));
+}
+
 const PORT = process.env.PORT || 3443;
-https.createServer(tls, app).listen(PORT, () => console.log('Forum (vulnérable) démarré en HTTPS sur le port ' + PORT));
+createAdminIfNoAccount()
+  .then(() => https.createServer(tls, app).listen(PORT, () => console.log('Forum démarré en HTTPS sur le port ' + PORT)))
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });

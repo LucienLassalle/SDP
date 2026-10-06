@@ -19,6 +19,16 @@ conteneurs (0644), c'est son dossier (0700) qui le protège sur l'hôte. Le mot 
 n'est pas utilisé. Un volume `db-data` créé avant ce changement ne contient pas ce compte : le recréer
 (`docker compose down -v`).
 
+Le forum démarre sans compte ni message. Chacun crée son compte sur `/register` ; les mots de passe sont hachés
+avec scrypt. Si la base ne contient aucun compte au démarrage,
+l'application crée un compte `admin` avec un mot de passe aléatoire, affiché une seule fois dans ses logs :
+
+```bash
+docker compose logs web | grep -A 2 'compte administrateur'
+```
+
+Ce mot de passe reste lisible dans les logs du conteneur : le changer après la première connexion.
+
 Au démarrage, le service `tls` (`tls/Dockerfile`, Alpine + openssl) crée un certificat autosigné dans le volume
 `tls` s'il manque ou expire dans moins de 30 jours, puis s'arrête. L'application le lit en lecture seule ; la clé
 n'est jamais dans une image ni dans le dépôt. Le certificat couvre `localhost` et `127.0.0.1` : pour un autre nom,

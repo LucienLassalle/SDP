@@ -1,0 +1,42 @@
+[Unit]
+Description=SDP - synchronisation de la source de la dernière release
+After=network-online.target docker.service sdp-check.service
+Wants=network-online.target
+Requires=docker.service sdp-check.service
+
+[Service]
+Type=oneshot
+User=root
+Group=sdp-deploy
+EnvironmentFile=-/opt/sdp/deploy/.env
+ExecStart=/bin/bash /usr/local/libexec/sdp-release-sync
+StateDirectory=sdp-release-sync
+StateDirectoryMode=0750
+UMask=0077
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/sdp /etc/systemd/system /etc/sysusers.d /etc/passwd /etc/group /etc/shadow /etc/gshadow /usr/local/libexec
+InaccessiblePaths=/run/docker.sock
+PrivateTmp=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+RestrictSUIDSGID=yes
+PrivateDevices=yes
+DevicePolicy=closed
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProcSubset=pid
+ProtectProc=invisible
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+RemoveIPC=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6

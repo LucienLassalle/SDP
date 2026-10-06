@@ -1,10 +1,10 @@
 [Unit]
-Description=SDP - recherche et déploiement des releases chaque heure
+Description=SDP - synchronisation et déploiement des releases toutes les 30 minutes
 
 [Timer]
 OnBootSec=30s
-OnUnitActiveSec=1h
-Unit=sdp-deploy.service
+OnUnitActiveSec=30min
+Unit=sdp-release-sync.service
 
 [Install]
 WantedBy=timers.target

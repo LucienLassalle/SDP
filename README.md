@@ -75,23 +75,30 @@ commit tagué, c'est ce qui empêche de publier une image depuis un `release.yml
 
 ## Déploiement sur le serveur
 
-Le serveur vérifie chaque heure s'il existe une nouvelle release (timer systemd `sdp-deploy.timer`). Si c'est le cas, il récupère les images correspondantes sur GHCR et remplace l'ancienne version avec le `docker-compose.yml` du dépôt (`image` = version publiée, `build` = construction locale pour le développement). Si les conteneurs ne deviennent pas sains (healthchecks), il revient automatiquement à la version précédente et ne retente pas la version défaillante.
+Toutes les 30 minutes, et 30 secondes après le démarrage, le timer `sdp-deploy.timer` vérifie la dernière release publiée. La VM télécharge son archive ZIP GitHub, synchronise le code et les unités systemd de cette release, puis récupère ses images depuis GHCR. Le code source et les images sont ainsi toujours épinglés au même tag de release, sans `git pull`. Si les conteneurs ne deviennent pas sains (healthchecks), elle revient à la version précédente et ne retente pas la version défaillante.
 
 GitHub n'a aucun accès au serveur : c'est le serveur qui vient chercher les releases.
 
-Deux services, chacun avec son utilisateur système (`deploy/sdp.sysusers`) :
+Trois services, dont deux avec un utilisateur système (`deploy/sdp.sysusers`) :
 
 | Service | Script | Accès |
 |---------|--------|-------|
 | `sdp-check` | `deploy/check.sh` | Interroge l'API GitHub, écrit le tag dans `/var/lib/sdp-check/latest-tag`. Réseau limité à l'API GitHub et à localhost, aucun accès à Docker |
-| `sdp-deploy` | `deploy/deploy.sh` | Lit ce tag et pilote Docker. Aucun réseau, `docker` comme seul groupe (accès équivalent à root via Docker : c'est son seul privilège) |
+| `sdp-release-sync` | `deploy/sync-release.sh` | Télécharge l'archive de la release, synchronise `/opt/sdp` et installe les unités `sdp-*`. Tourne en root pour pouvoir modifier `/etc/systemd/system`; sandboxé par systemd |
+| `sdp-deploy` | `deploy/deploy.sh` | Déploie l'image du tag synchronisé. Aucun réseau ; groupe `docker` pour Docker et groupe `sdp-deploy` pour le seul fichier de verrou |
 
-Le timer lance `sdp-deploy`, qui démarre d'abord `sdp-check`. Les deux tournent en lecture seule sur le
-système, dans leur propre espace utilisateurs, sans capability.
+Le timer lance `sdp-release-sync`, qui démarre d'abord `sdp-check`, puis déclenche `sdp-deploy`. Les services de
+vérification et de déploiement tournent dans leur propre espace utilisateurs, sans capability.
+Les nouveaux fichiers `sdp-*.service` et `sdp-*.timer` de la release sont installés automatiquement. Les unités
+dotées d'une section `[Install]` sont activées ; les timers déjà actifs sont redémarrés pour prendre immédiatement
+en compte leur nouvelle fréquence. La synchronisation retire aussi les anciennes unités `sdp-*` absentes de la
+release. Les fichiers `sdp-*` des releases sont donc du code privilégié : ils ne sont appliqués qu'après la
+publication contrôlée de la release.
 
 Prérequis :
 - le groupe `docker` existe et `docker compose` est installé dans un dossier système (`/usr/lib*/docker/cli-plugins`) ;
 - la résolution DNS passe par systemd-resolved (`127.0.0.53`) : `sdp-check` ne peut joindre que localhost et l'API GitHub ;
+- l'archive source est téléchargée depuis `codeload.github.com` par le service de synchronisation ;
 - les plages IP de l'API GitHub sont dans `IPAddressAllow=` de `deploy/sdp-check.service`. Si GitHub les change
   (https://api.github.com/meta, clé `api`), les mettre à jour.
 
@@ -103,31 +110,43 @@ curl -fsSL https://raw.githubusercontent.com/LucienLassalle/SDP/main/deploy/boot
   | sudo env TLS_SAN=DNS:localhost,IP:127.0.0.1,IP:192.168.1.118 bash
 ```
 
-Adapter `TLS_SAN` à l'adresse ou au nom utilisé pour accéder au serveur. Le script installe Docker, Compose et
-`systemd-resolved`, crée
-les secrets uniquement s'ils n'existent pas déjà, installe les services, active le timer et déclenche le premier
-déploiement. Il reprend le résolveur DHCP courant ; si nécessaire, le préciser avec `DNS_SERVER=192.168.1.254`.
-Pour une image privée, fournir aussi `GH_TOKEN` et `GH_USER` dans l'environnement du script. Les identifiants
-et secrets restent locaux à la VM et ne sont pas écrasés lors des relances.
+La fonctionnalité de synchronisation doit d'abord être incluse dans une release publiée. La VM ne récupère pas
+les modifications de `main` directement : elle applique uniquement le code et les images de la dernière release.
+Après publication de cette release, exécuter le bootstrap ci-dessus une fois sur la VM déjà installée pour activer
+le nouveau timer et synchroniser immédiatement les fichiers.
 
-Relancer le même script met à jour le checkout `/opt/sdp`, les unités systemd et le déploiement. Une fois le
-timer installé, les images des nouvelles releases continuent d'être déployées automatiquement chaque heure.
-Après chaque déploiement réussi, le service enregistre les digests SHA-256 réellement tirés de GHCR dans
-`/var/lib/sdp-deploy/.current-digests` et les écrit dans le journal (`journalctl -u sdp-deploy`).
-À chaque vérification horaire, il contrôle que les digests des images locales n'ont pas changé depuis le
-déploiement. Le téléchargement par Docker vérifie déjà l'intégrité des blobs par digest ; le fichier permet aussi
-de comparer l'identifiant immuable de chaque image avec le digest annoncé par le workflow Release.
+Adapter `TLS_SAN` à l'adresse ou au nom utilisé pour accéder au serveur. Le script télécharge l'archive ZIP de la
+dernière release, installe Docker, Compose et `systemd-resolved`, crée les secrets seulement s'ils n'existent pas,
+installe les services, active le timer et déclenche le premier déploiement. Il reprend le résolveur DHCP courant ;
+si nécessaire, le préciser avec `DNS_SERVER=192.168.1.254`.
+
+Relancer le bootstrap met à jour la VM vers l'archive de la dernière release. Pour une image ou un dépôt privé,
+fournir `GH_TOKEN` et `GH_USER` dans l'environnement du bootstrap ; le token doit avoir `read:packages` et
+`contents:read` si le dépôt est privé. Les secrets applicatifs et le fichier `.env` restent locaux à la VM et ne
+sont pas remplacés par les archives.
+
+Le tag des sources synchronisées est enregistré dans `/var/lib/sdp-release-sync/source-tag` ; le tag utilisé
+pour les images est dans `/var/lib/sdp-deploy/.current-tag`. Ils sont identiques après un cycle réussi. Un
+verrou partagé empêche une synchronisation de modifier le code pendant qu'un déploiement l'utilise. Si une
+synchronisation est interrompue en cours, le déploiement reste suspendu jusqu'à la prochaine synchronisation
+réussie. Les digests SHA-256 des trois images sont consignés dans `/var/lib/sdp-deploy/.current-digests` et
+revérifiés à chaque cycle ; ils apparaissent dans le journal du service de déploiement.
+Suivre un cycle avec `journalctl -u sdp-check -u sdp-release-sync -u sdp-deploy`.
 
 Depuis l'ancien service `sdp-update` : `systemctl disable --now sdp-update.timer`, puis supprimer
 `/etc/systemd/system/sdp-update.*` avant l'installation ci-dessus.
 
-Si le dépôt ou les images sont privés, créer un token GitHub en lecture (`read:packages`, et `contents:read`
-si le dépôt est privé). `sdp-check` l'utilise pour l'API, `sdp-deploy` pour se connecter à GHCR :
+Pour configurer les identifiants d'un dépôt ou d'images privés après l'installation :
 
 ```bash
-install -m 600 /dev/null /opt/sdp/deploy/.env
-echo "GH_TOKEN=<token>" >> /opt/sdp/deploy/.env
-echo "GH_USER=<utilisateur du token>" >> /opt/sdp/deploy/.env
+sudoedit /opt/sdp/deploy/.env
 ```
 
-Suivi : `journalctl -u sdp-check -u sdp-deploy -f` · version en ligne : `cat /var/lib/sdp-deploy/.current-tag`
+Ajouter sans effacer les variables existantes :
+
+```dotenv
+GH_TOKEN=<token>
+GH_USER=<utilisateur du token>
+```
+
+Version d'image en ligne : `cat /var/lib/sdp-deploy/.current-tag`

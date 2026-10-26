@@ -12,6 +12,6 @@
     "ejs": "7.0.1",
     "express": "5.2.1",
     "express-session": "1.19.0",
-    "mysql2": "3.24.5"
+    "mysql2": "3.24.6"
   }
 }

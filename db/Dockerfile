@@ -1,4 +1,4 @@
-FROM mysql:9.7.2@sha256:e2bde46db6563855d7177adb5f0b57b9dc663f5a20927a90f4259d3312068497
+FROM mysql:26.10.0@sha256:3819b2b23835c4a73c8b022fafc33c8095c0f81c929a8b7a84613d2fba6c52f5
 
 # MySQL Shell et gosu ne servent pas au serveur et embarquent des vulnérabilités
 RUN rpm -e mysql-shell && rm -f /usr/local/bin/gosu
